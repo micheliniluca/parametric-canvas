@@ -1,0 +1,7 @@
+body { margin: 0; font-family: sans-serif; }
+.app { height: 100vh; display: flex; flex-direction: column; }
+.toolbar { padding: 8px; background: #eee; display: flex; gap: 8px; }
+.main { flex: 1; display: flex; }
+.canvas { flex: 1; background: #fff; border: 1px solid #ccc; }
+.inspector { width: 240px; padding: 8px; border-left: 1px solid #ccc; display: flex; flex-direction: column; gap: 6px; }
+.inspector label { display: flex; justify-content: space-between; gap: 8px; }

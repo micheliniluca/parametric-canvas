@@ -11,7 +11,11 @@ import {
   Zap,
   Camera,
   Layers,
-  CircleDot
+  CircleDot,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUp,
+  ChevronsDown
 } from 'lucide-react'
 
 type Props = {
@@ -27,6 +31,11 @@ type Props = {
   isBoltMode: boolean
   setIsBoltMode: Dispatch<SetStateAction<boolean>>
   drawingPolyline: Point[] | null
+  bringToFront: () => void
+  sendToBack: () => void
+  bringForward: () => void
+  sendBackward: () => void
+  selectedId: string | null
 }
 
 export function Toolbar({
@@ -42,6 +51,11 @@ export function Toolbar({
   setIsBoltMode,
   isBoltMode,
   drawingPolyline,
+  bringToFront,
+  sendToBack,
+  bringForward,
+  sendBackward,
+  selectedId,
 }: Props) {
   const addRect = () => {
     const c = getCenter()
@@ -131,6 +145,8 @@ export function Toolbar({
         x: c.x,
         y: c.y,
         scale: 1,
+        viewType: 'front',
+        length: 400,
         stroke: '#0f172a',
         fillEnabled: true,
         fillColor: '#94a3b8',
@@ -197,6 +213,26 @@ export function Toolbar({
           <Zap size={20} />
         </button>
       </div>
+
+      {selectedId && (
+        <>
+          <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: '0 8px' }} />
+          <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.03)', padding: '4px', borderRadius: '10px' }}>
+            <button onClick={bringToFront} title="Porta in primo piano">
+              <ChevronsUp size={20} />
+            </button>
+            <button onClick={bringForward} title="Porta avanti">
+              <ChevronUp size={20} />
+            </button>
+            <button onClick={sendBackward} title="Manda indietro">
+              <ChevronDown size={20} />
+            </button>
+            <button onClick={sendToBack} title="Manda in fondo">
+              <ChevronsDown size={20} />
+            </button>
+          </div>
+        </>
+      )}
 
       <div style={{ flex: 1 }} />
 

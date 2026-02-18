@@ -8,6 +8,7 @@ export type BaseObject = {
   strokeWidth?: number // Using this for thickness
   fillColor?: string
   fillEnabled?: boolean
+  rotation?: number // Degrees
 }
 
 export type RectObject = BaseObject & {
@@ -37,6 +38,8 @@ export type ProfileObject = BaseObject & {
   profileType: 'IPE' | 'HEA' | 'HEB'
   profileName: string
   scale: number
+  viewType: 'front' | 'side' | 'top'
+  length: number
 }
 
 export type PolylineObject = {
@@ -48,6 +51,7 @@ export type PolylineObject = {
   strokeWidth?: number
   fillEnabled: boolean
   fillColor?: string
+  rotation?: number
 }
 
 export type ImageObject = BaseObject & {
@@ -75,6 +79,8 @@ export type BoltObject = BaseObject & {
   spacingY: string
   offsetX: number // Shift from start along X
   offsetY: number // Shift from axis along Y
+  viewType: 'top' | 'side'
+  length: number
 }
 
 export type SymbolType = 'bubble'

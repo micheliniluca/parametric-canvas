@@ -163,3 +163,52 @@ export const getBoltHeadPath = (diameter: number): string => {
     d += "Z"
     return d
 }
+
+export type BoltShape = {
+    d: string
+    fill?: string
+    stroke?: string
+    strokeWidth?: number
+}
+
+export const getBoltSideShapes = (diameter: number, length: number): BoltShape[] => {
+    // Standard bolt head height k ~ 0.65 * d
+    // Nut height m ~ 0.8 * d
+    // Washer thickness h ~ 0.15 * d
+    const k = diameter * 0.7
+    const m = diameter * 0.8
+    const h = diameter * 0.15
+    const headWidth = diameter * 1.6 // Approximately
+
+    const shapes: BoltShape[] = []
+
+    // Head (Rectangle at top)
+    // Centered at x=0, top at y=0
+    shapes.push({
+        d: `M ${-headWidth / 2} 0 h ${headWidth} v ${k} h ${-headWidth} Z`,
+        fill: "none"
+    })
+
+    // Shaft (Rectangle starting after head)
+    shapes.push({
+        d: `M ${-diameter / 2} ${k} h ${diameter} v ${length} h ${-diameter} Z`,
+        fill: "none"
+    })
+
+    // Washer (Rectangle near the end or at some distance)
+    // Let's place it at length - m - h
+    const washerY = k + length - m - h
+    shapes.push({
+        d: `M ${-headWidth * 0.6} ${washerY} h ${headWidth * 1.2} v ${h} h ${-headWidth * 1.2} Z`,
+        fill: "none"
+    })
+
+    // Nut (Rectangle after washer)
+    const nutY = washerY + h
+    shapes.push({
+        d: `M ${-headWidth / 2} ${nutY} h ${headWidth} v ${m} h ${-headWidth} Z`,
+        fill: "none"
+    })
+
+    return shapes
+}

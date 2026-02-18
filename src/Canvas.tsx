@@ -1,14 +1,14 @@
-import { CanvasObject } from './types'
+import { CanvasObject, PolylineObject, Point } from './types'
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react'
 import { ALL_PROFILES } from './profiles'
 import { generateBeamPath, getBeamPoints } from './beamPath'
-import { getBoltPositions, getBoltHeadPath } from './utils/boltUtils'
+import { getBoltPositions, getBoltHeadPath, getBoltSideShapes } from './utils/boltUtils'
+import { round1 } from './utils/mathUtils'
 
 const GRID_EXTENT = 5000
 const DRAG_THRESHOLD = 6
 const SNAP_THRESHOLD = 20
 
-type Point = { x: number; y: number }
 type Props = {
   objects: CanvasObject[]
   setObjects: Dispatch<SetStateAction<CanvasObject[]>>
@@ -109,6 +109,15 @@ export function Canvas({
   } | null>(null)
 
   const arrowGripRef = useRef<ArrowGrip | null>(null)
+  const boltGripRef = useRef<{ id: string; point: 'p1' | 'p2' } | null>(null)
+
+  const rotationRef = useRef<{
+    id: string
+    cx: number
+    cy: number
+    startAngle: number
+    initialRotation: number
+  } | null>(null)
 
   const [drawingArrow, setDrawingArrow] = useState<{
     x1: number
@@ -126,6 +135,46 @@ export function Canvas({
   const snap = (v: number, step: number) =>
     Math.round(v / step) * step
 
+  const rotatePoint = (p: Point, center: Point, angleDegrees: number): Point => {
+    if (!angleDegrees || angleDegrees === 0) return p
+    const rad = (angleDegrees * Math.PI) / 180
+    const dx = p.x - center.x
+    const dy = p.y - center.y
+    return {
+      x: center.x + dx * Math.cos(rad) - dy * Math.sin(rad),
+      y: center.y + dx * Math.sin(rad) + dy * Math.cos(rad)
+    }
+  }
+
+  const getObjectCenter = (o: CanvasObject): Point => {
+    if (o.type === 'rect' || o.type === 'image') return { x: o.x + o.width / 2, y: o.y + o.height / 2 }
+    if (o.type === 'circle') return { x: o.x, y: o.y }
+    if (o.type === 'text') {
+      const fontSize = o.fontSize || 20
+      const padding = o.boxPadding || 10
+      const w = o.width || (o.text.length * (fontSize * 0.6) + padding * 2)
+      const h = o.height || (fontSize + padding * 2)
+      return { x: o.x + w / 2, y: o.y + h / 2 }
+    }
+    if (o.type === 'profile') {
+      if (o.viewType === 'front') return { x: o.x, y: o.y }
+      return { x: o.x + (o.length / 2) * o.scale, y: o.y }
+    }
+    if (o.type === 'arrow') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
+    if (o.type === 'bolt') return { x: (o.p1.x + o.p2.x) / 2, y: (o.p1.y + o.p2.y) / 2 }
+    if (o.type === 'symbol') return { x: o.x, y: o.y }
+    if (o.type === 'polyline') {
+      const pl = o as PolylineObject
+      if (pl.points.length === 0) return { x: 0, y: 0 }
+      const minX = Math.min(...pl.points.map((p: Point) => p.x))
+      const maxX = Math.max(...pl.points.map((p: Point) => p.x))
+      const minY = Math.min(...pl.points.map((p: Point) => p.y))
+      const maxY = Math.max(...pl.points.map((p: Point) => p.y))
+      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
+    }
+    return { x: (o as any).x || 0, y: (o as any).y || 0 }
+  }
+
   const getSnapPoint = (worldX: number, worldY: number, excludeId?: string): Point => {
     if (!snapEnabled) return { x: worldX, y: worldY }
 
@@ -134,29 +183,39 @@ export function Canvas({
     objects.forEach((o: CanvasObject) => {
       if (o.id === excludeId) return
 
+      const center = getObjectCenter(o)
+      const rotation = (o as any).rotation || 0
+
+      const rotate = (p: Point): Point => rotatePoint(p, center, rotation)
+
       if (o.type === 'rect' || o.type === 'image') {
-        candidates.push({ x: o.x, y: o.y })
-        candidates.push({ x: o.x + o.width, y: o.y })
-        candidates.push({ x: o.x, y: o.y + o.height })
-        candidates.push({ x: o.x + o.width, y: o.y + o.height })
+        candidates.push(rotate({ x: o.x, y: o.y }))
+        candidates.push(rotate({ x: o.x + o.width, y: o.y }))
+        candidates.push(rotate({ x: o.x, y: o.y + o.height }))
+        candidates.push(rotate({ x: o.x + o.width, y: o.y + o.height }))
       } else if (o.type === 'circle') {
         candidates.push({ x: o.x, y: o.y })
       } else if (o.type === 'profile') {
         const profile = ALL_PROFILES.find(p => p.name === o.profileName)
         if (profile) {
-          const pts = getBeamPoints(profile)
+          const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
           pts.forEach((p: Point) => {
-            candidates.push({
+            candidates.push(rotate({
               x: o.x + p.x * o.scale,
               y: o.y + p.y * o.scale
-            })
+            }))
           })
         }
       } else if (o.type === 'polyline') {
-        o.points.forEach((p: Point) => candidates.push(p))
+        o.points.forEach((p: Point) => candidates.push(rotate(p)))
       } else if (o.type === 'bolt') {
         const boltPositions = getBoltPositions(o)
-        boltPositions.forEach(bp => candidates.push(bp))
+        boltPositions.forEach(bp => candidates.push(rotate(bp)))
+      } else if (o.type === 'arrow') {
+        candidates.push(rotate({ x: o.x1, y: o.y1 }))
+        candidates.push(rotate({ x: o.x2, y: o.y2 }))
+      } else if (o.type === 'symbol') {
+        candidates.push({ x: o.x, y: o.y })
       }
     })
 
@@ -266,6 +325,43 @@ export function Canvas({
       const wy = (p.y / zoom) + view.y
       const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
       setDrawingBolt(prev => prev ? { ...prev, p2: snapped } : null)
+      return
+    }
+
+    if (boltGripRef.current) {
+      const g = boltGripRef.current
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      const snapped = snapEnabled ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
+
+      setObjects(objs => objs.map(o => {
+        if (o.id !== g.id || o.type !== 'bolt') return o
+        if (g.point === 'p1') return { ...o, p1: snapped, x: snapped.x, y: snapped.y }
+        return { ...o, p2: snapped }
+      }))
+      return
+    }
+
+    if (rotationRef.current) {
+      const { id, cx, cy, startAngle, initialRotation } = rotationRef.current
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+
+      const currentAngle = Math.atan2(wy - cy, wx - cx) * 180 / Math.PI
+      let delta = currentAngle - startAngle
+
+      // Snap to 15 degrees if shift is pressed
+      let newRotation = initialRotation + delta
+      if (e.shiftKey) {
+        newRotation = Math.round(newRotation / 15) * 15
+      }
+
+      setObjects(objs => objs.map(o => {
+        if (o.id !== id) return o
+        return { ...o, rotation: newRotation }
+      }))
       return
     }
 
@@ -546,12 +642,16 @@ export function Canvas({
           spacingY: '50',
           offsetX: 0,
           offsetY: 0,
+          viewType: 'top',
+          length: 60,
         }
       ])
       setDrawingBolt(null)
       setIsBoltMode(false)
     }
 
+    rotationRef.current = null
+    boltGripRef.current = null
     dragRef.current = null
     resizeRef.current = null
     polylineGripRef.current = null
@@ -734,6 +834,9 @@ export function Canvas({
         {/* oggetti */}
         {objects.map(o => {
           const isSelected = o.id === selectedId
+          const isCreationMode = isArrowMode || isBoltMode || !!drawingPolyline
+          const basePointerEvents = isCreationMode ? 'none' : 'all'
+
           // Use explicit fill or fillOpacity=0 for hit testing
           const hasFill = o.fillEnabled
           const fillColor = o.fillColor || '#cbd5e1'
@@ -751,9 +854,13 @@ export function Canvas({
             finalOpacity = 1
           }
 
+          const center = getObjectCenter(o)
+          const rotation = (o as any).rotation || 0
+          const rotateTransform = rotation ? `rotate(${rotation}, ${center.x}, ${center.y})` : ''
+
           if (o.type === 'rect' || o.type === 'image') {
             return (
-              <g key={o.id}>
+              <g key={o.id} transform={rotateTransform}>
                 {o.type === 'rect' ? (
                   <rect
                     x={o.x}
@@ -765,7 +872,7 @@ export function Canvas({
                     stroke={strokeValue}
                     strokeWidth={strokeWidth}
                     onMouseDown={e => onObjectMouseDown(e, o)}
-                    style={{ pointerEvents: 'all' }}
+                    style={{ pointerEvents: basePointerEvents }}
                   />
                 ) : (
                   <image
@@ -776,7 +883,7 @@ export function Canvas({
                     height={o.height}
                     opacity={o.opacity}
                     onMouseDown={e => onObjectMouseDown(e, o)}
-                    style={{ outline: isSelected ? '2px solid orange' : 'none', pointerEvents: 'all' }}
+                    style={{ outline: isSelected ? '2px solid orange' : 'none', pointerEvents: basePointerEvents }}
                   />
                 )}
 
@@ -821,14 +928,14 @@ export function Canvas({
             const pointerMode = 'all'
 
             return (
-              <g key={o.id}>
+              <g key={o.id} transform={rotateTransform}>
                 {/* Polyline */}
                 <polyline
                   points={o.points.map(p => `${p.x},${p.y}`).join(' ')}
                   fill={fillValue}
                   stroke={strokeValue}
                   strokeWidth={isSelected ? 4 : 2}
-                  pointerEvents={pointerMode}
+                  pointerEvents={basePointerEvents}
                   onMouseDown={e => {
                     e.stopPropagation()
                     onObjectMouseDown(e, o)
@@ -875,7 +982,7 @@ export function Canvas({
             const isSelected = o.id === selectedId
 
             return (
-              <g key={o.id}>
+              <g key={o.id} transform={rotateTransform}>
                 <g onMouseDown={(e: React.MouseEvent) => onObjectMouseDown(e, o)}>
                   {o.boxEnabled && (
                     <rect
@@ -886,7 +993,7 @@ export function Canvas({
                       fill={o.fillEnabled ? (o.fillColor || 'white') : 'transparent'}
                       stroke={o.stroke || '#000000'}
                       strokeWidth={o.strokeWidth || 2}
-                      style={{ pointerEvents: 'all' }}
+                      style={{ pointerEvents: basePointerEvents }}
                     />
                   )}
                   <text
@@ -940,12 +1047,13 @@ export function Canvas({
             const headLen = Math.max(2, sw * 4)
 
             return (
-              <g key={o.id}>
+              <g key={o.id} transform={rotateTransform}>
                 {/* Hit area (invibile ma più larga per selezione facile) */}
                 <line
                   x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2}
                   stroke="transparent"
                   strokeWidth={Math.max(15, sw + 10)}
+                  style={{ pointerEvents: basePointerEvents }}
                   onMouseDown={(e) => onObjectMouseDown(e, o)}
                   cursor="pointer"
                 />
@@ -994,30 +1102,55 @@ export function Canvas({
           if (o.type === 'bolt') {
             const isSelected = o.id === selectedId
             const points = getBoltPositions(o)
+            const headPath = getBoltHeadPath(o.diameter)
 
             return (
-              <g key={o.id}>
+              <g key={o.id} transform={rotateTransform}>
                 {/* Axis Line */}
                 <line
                   x1={o.p1.x} y1={o.p1.y} x2={o.p2.x} y2={o.p2.y}
                   stroke={isSelected ? "orange" : "#cbd5e1"}
                   strokeWidth={1}
                   strokeDasharray="5,5"
+                  pointerEvents="none"
                 />
 
                 {/* Bolts */}
-                {points.map((p, i) => (
-                  <g key={i} transform={`translate(${p.x}, ${p.y})`}>
-                    <circle
-                      r={o.diameter / 2}
-                      fill="none"
-                      stroke={isSelected ? "orange" : "black"}
-                      strokeWidth={1}
-                    />
-                    <line x1={-o.diameter / 2} y1={0} x2={o.diameter / 2} y2={0} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
-                    <line x1={0} y1={-o.diameter / 2} x2={0} y2={o.diameter / 2} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
-                  </g>
-                ))}
+                {points.map((p, i) => {
+                  if (o.viewType === 'side') {
+                    const sideShapes = getBoltSideShapes(o.diameter, o.length)
+                    // Angle of the axis line
+                    const angleRad = Math.atan2(o.p2.y - o.p1.y, o.p2.x - o.p1.x)
+                    const angleDeg = (angleRad * 180) / Math.PI + 90 // Perpendicular to axis
+
+                    return (
+                      <g key={i} transform={`translate(${p.x}, ${p.y}) rotate(${angleDeg})`}>
+                        {sideShapes.map((s, si) => (
+                          <path
+                            key={si}
+                            d={s.d}
+                            fill="none"
+                            stroke={isSelected ? "orange" : "black"}
+                            strokeWidth={1}
+                          />
+                        ))}
+                      </g>
+                    )
+                  }
+
+                  return (
+                    <g key={i} transform={`translate(${p.x}, ${p.y})`}>
+                      <path
+                        d={headPath}
+                        fill="none"
+                        stroke={isSelected ? "orange" : "black"}
+                        strokeWidth={1}
+                      />
+                      <line x1={-o.diameter / 5} y1={0} x2={o.diameter / 5} y2={0} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
+                      <line x1={0} y1={-o.diameter / 5} x2={0} y2={o.diameter / 5} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
+                    </g>
+                  )
+                })}
 
                 {/* Hit Area */}
                 <line
@@ -1025,8 +1158,33 @@ export function Canvas({
                   stroke="transparent"
                   strokeWidth={20}
                   cursor="pointer"
+                  style={{ pointerEvents: basePointerEvents }}
                   onMouseDown={(e) => onObjectMouseDown(e, o)}
                 />
+
+                {/* Grips */}
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={o.p1.x} cy={o.p1.y} r={6}
+                      fill="white" stroke="black"
+                      cursor="move"
+                      onMouseDown={e => {
+                        e.stopPropagation()
+                        boltGripRef.current = { id: o.id, point: 'p1' }
+                      }}
+                    />
+                    <circle
+                      cx={o.p2.x} cy={o.p2.y} r={6}
+                      fill="white" stroke="black"
+                      cursor="move"
+                      onMouseDown={e => {
+                        e.stopPropagation()
+                        boltGripRef.current = { id: o.id, point: 'p2' }
+                      }}
+                    />
+                  </>
+                )}
               </g>
             )
           }
@@ -1035,7 +1193,7 @@ export function Canvas({
             const isSelected = o.id === selectedId
             if (o.symbolType === 'bubble') {
               return (
-                <g key={o.id} onMouseDown={(e: React.MouseEvent) => onObjectMouseDown(e, o)}>
+                <g key={o.id} transform={rotateTransform} onMouseDown={(e: React.MouseEvent) => onObjectMouseDown(e, o)}>
                   <circle
                     cx={o.x}
                     cy={o.y}
@@ -1043,7 +1201,7 @@ export function Canvas({
                     fill={o.fillEnabled ? (o.fillColor || '#ffff00') : 'transparent'}
                     stroke={o.stroke || '#000000'}
                     strokeWidth={o.strokeWidth || 2}
-                    style={{ pointerEvents: 'all' }}
+                    style={{ pointerEvents: basePointerEvents }}
                   />
                   <text
                     x={o.x}
@@ -1074,8 +1232,9 @@ export function Canvas({
                 fillOpacity={finalOpacity}
                 stroke={strokeValue}
                 strokeWidth={strokeWidth}
+                transform={rotateTransform}
                 onMouseDown={e => onObjectMouseDown(e, o)}
-                style={{ cursor: 'move', pointerEvents: 'all' }}
+                style={{ cursor: 'move', pointerEvents: basePointerEvents }}
               />
             )
           }
@@ -1085,14 +1244,15 @@ export function Canvas({
             if (!profile) return null
             const s = o.scale
 
-            const pathData = generateBeamPath(profile)
+            const { path: mainPath, dashed: dashedPath } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
 
             return (
               <g key={o.id}
-                transform={`translate(${o.x}, ${o.y}) scale(${s})`}
-                onMouseDown={e => onObjectMouseDown(e, o)}>
+                transform={`${rotateTransform} translate(${o.x}, ${o.y}) scale(${s})`}
+                onMouseDown={e => onObjectMouseDown(e, o)}
+                style={{ pointerEvents: basePointerEvents }}>
                 <path
-                  d={pathData}
+                  d={mainPath}
                   fill={finalFill}
                   fillOpacity={finalOpacity}
                   stroke={strokeValue}
@@ -1100,12 +1260,102 @@ export function Canvas({
                   vectorEffect="non-scaling-stroke"
                   style={{ pointerEvents: 'all' }}
                 />
+                {dashedPath && (
+                  <path
+                    d={dashedPath}
+                    fill="none"
+                    stroke={strokeValue}
+                    strokeWidth={(strokeWidth / 2) / s} // Slightly thinner hidden lines
+                    strokeDasharray="4 2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
               </g>
             )
           }
 
           return null
         })}
+
+        {/* GONIOMETRO (Rotation Protractor) */}
+        {selectedId && (() => {
+          const selObj = objects.find(o => o.id === selectedId)
+          if (!selObj) return null
+
+          const center = getObjectCenter(selObj)
+          const rot = (selObj as any).rotation || 0
+
+          // Determine a reasonable radius for the protractor
+          let r = 50
+          if (selObj.type === 'rect' || selObj.type === 'image') {
+            r = Math.max(selObj.width, selObj.height) / 2 + 40
+          } else if (selObj.type === 'circle') {
+            r = selObj.radius + 40
+          } else if (selObj.type === 'profile') {
+            r = Math.max(selObj.length * selObj.scale, 100) / 2 + 40
+          } else if (selObj.type === 'polyline') {
+            // rough estimate
+            r = 100
+          }
+
+          const handleR = 8
+          const handleAngle = (rot - 90) * Math.PI / 180 // Start top
+          const handleX = center.x + r * Math.cos(handleAngle)
+          const handleY = center.y + r * Math.sin(handleAngle)
+
+          return (
+            <g className="protractor-overlay">
+              {/* Main Ring */}
+              <circle
+                cx={center.x}
+                cy={center.y}
+                r={r}
+                fill="none"
+                stroke="rgba(99, 102, 241, 0.3)"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                pointerEvents="none"
+              />
+
+              {/* Rotation Handle */}
+              <circle
+                cx={handleX}
+                cy={handleY}
+                r={handleR}
+                fill="white"
+                stroke="#6366f1"
+                strokeWidth={2}
+                cursor="alias"
+                onMouseDown={e => {
+                  e.stopPropagation()
+                  const p = getSvgPoint(e)
+                  const wx = (p.x / zoom) + view.x
+                  const wy = (p.y / zoom) + view.y
+                  const angle = Math.atan2(wy - center.y, wx - center.x) * 180 / Math.PI
+                  rotationRef.current = {
+                    id: selectedId,
+                    cx: center.x,
+                    cy: center.y,
+                    startAngle: angle,
+                    initialRotation: rot
+                  }
+                }}
+              />
+
+              {/* Degrees display */}
+              <text
+                x={center.x}
+                y={center.y + r + 20}
+                fill="#6366f1"
+                fontSize={12}
+                textAnchor="middle"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {round1(rot)}°
+              </text>
+            </g>
+          )
+        })()}
 
         {drawingArrow && (
           <line

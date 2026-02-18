@@ -176,6 +176,59 @@ export default function App() {
   }
 
   /* ======================
+     Z-ORDER (ORDERING)
+     ====================== */
+  const bringToFront = () => {
+    if (!selectedId) return
+    setObjects(objs => {
+      const idx = objs.findIndex(o => o.id === selectedId)
+      if (idx === -1) return objs
+      const newObjs = [...objs]
+      const [item] = newObjs.splice(idx, 1)
+      newObjs.push(item)
+      return newObjs
+    })
+  }
+
+  const sendToBack = () => {
+    if (!selectedId) return
+    setObjects(objs => {
+      const idx = objs.findIndex(o => o.id === selectedId)
+      if (idx === -1) return objs
+      const newObjs = [...objs]
+      const [item] = newObjs.splice(idx, 1)
+      newObjs.unshift(item)
+      return newObjs
+    })
+  }
+
+  const bringForward = () => {
+    if (!selectedId) return
+    setObjects(objs => {
+      const idx = objs.findIndex(o => o.id === selectedId)
+      if (idx === -1 || idx === objs.length - 1) return objs
+      const newObjs = [...objs]
+      const temp = newObjs[idx]
+      newObjs[idx] = newObjs[idx + 1]
+      newObjs[idx + 1] = temp
+      return newObjs
+    })
+  }
+
+  const sendBackward = () => {
+    if (!selectedId) return
+    setObjects(objs => {
+      const idx = objs.findIndex(o => o.id === selectedId)
+      if (idx === -1 || idx === 0) return objs
+      const newObjs = [...objs]
+      const temp = newObjs[idx]
+      newObjs[idx] = newObjs[idx - 1]
+      newObjs[idx - 1] = temp
+      return newObjs
+    })
+  }
+
+  /* ======================
      RENDER
      ====================== */
   return (
@@ -213,6 +266,11 @@ export default function App() {
             isBoltMode={isBoltMode}
             setIsBoltMode={setIsBoltMode}
             drawingPolyline={drawingPolyline}
+            bringToFront={bringToFront}
+            sendToBack={sendToBack}
+            bringForward={bringForward}
+            sendBackward={sendBackward}
+            selectedId={selectedId}
           />
         </div>
       </div>

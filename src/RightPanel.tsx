@@ -4,6 +4,7 @@ import { Catalog } from './components/Catalog'
 import { ALL_PROFILES } from './profiles'
 import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
 import { captureSvgToClipboard } from './utils/capture'
+import { round1 } from './utils/mathUtils'
 import {
   Settings2,
   Database,
@@ -91,7 +92,7 @@ export function RightPanel({
             <input
               type="number"
               value={gridSize}
-              onChange={e => setGridSize(Math.max(10, Number(e.target.value)))}
+              onChange={e => setGridSize(round1(Math.max(10, Number(e.target.value))))}
             />
           </div>
           <div className="prop-field">
@@ -146,6 +147,8 @@ export function RightPanel({
               profileType: profile.type,
               profileName: profile.name,
               scale: 1,
+              viewType: 'front',
+              length: 400,
               x: c.x,
               y: c.y,
               stroke: '#0f172a',
@@ -202,16 +205,16 @@ export function RightPanel({
                         <label>X (mm)</label>
                         <input
                           type="number"
-                          value={selected.x}
-                          onChange={e => onChange({ x: Number(e.target.value) })}
+                          value={round1(selected.x)}
+                          onChange={e => onChange({ x: round1(Number(e.target.value)) })}
                         />
                       </div>
                       <div className="prop-field">
                         <label>Y (mm)</label>
                         <input
                           type="number"
-                          value={selected.y}
-                          onChange={e => onChange({ y: Number(e.target.value) })}
+                          value={round1(selected.y)}
+                          onChange={e => onChange({ y: round1(Number(e.target.value)) })}
                         />
                       </div>
                     </>
@@ -223,16 +226,16 @@ export function RightPanel({
                         <label>Larghezza</label>
                         <input
                           type="number"
-                          value={(selected as any).width || 0}
-                          onChange={e => onChange({ width: Math.max(0, Number(e.target.value)) })}
+                          value={round1((selected as any).width || 0)}
+                          onChange={e => onChange({ width: round1(Math.max(0, Number(e.target.value))) })}
                         />
                       </div>
                       <div className="prop-field">
                         <label>Altezza</label>
                         <input
                           type="number"
-                          value={(selected as any).height || 0}
-                          onChange={e => onChange({ height: Math.max(0, Number(e.target.value)) })}
+                          value={round1((selected as any).height || 0)}
+                          onChange={e => onChange({ height: round1(Math.max(0, Number(e.target.value))) })}
                         />
                       </div>
                     </>
@@ -243,8 +246,8 @@ export function RightPanel({
                       <label>Raggio</label>
                       <input
                         type="number"
-                        value={selected.radius}
-                        onChange={e => onChange({ radius: Math.max(0, Number(e.target.value)) })}
+                        value={round1(selected.radius)}
+                        onChange={e => onChange({ radius: round1(Math.max(0, Number(e.target.value))) })}
                       />
                     </div>
                   )}
@@ -271,7 +274,7 @@ export function RightPanel({
                           ))}
                         </select>
                       </div>
-                      <div className="prop-field full-width">
+                      <div className="prop-field">
                         <label>Profilo</label>
                         <select
                           value={selected.profileName}
@@ -282,6 +285,25 @@ export function RightPanel({
                           ))}
                         </select>
                       </div>
+                      <div className="prop-field">
+                        <label>Vista</label>
+                        <select
+                          value={selected.viewType || 'front'}
+                          onChange={e => onChange({ viewType: e.target.value as any })}
+                        >
+                          <option value="front">Frontale</option>
+                          <option value="side">Laterale</option>
+                          <option value="top">Superiore</option>
+                        </select>
+                      </div>
+                      <div className="prop-field">
+                        <label>Lunghezza (mm)</label>
+                        <input
+                          type="number"
+                          value={round1(selected.length || 400)}
+                          onChange={e => onChange({ length: round1(Number(e.target.value)) })}
+                        />
+                      </div>
                     </>
                   )}
 
@@ -291,11 +313,20 @@ export function RightPanel({
                       <input
                         type="number"
                         step="0.1"
-                        value={selected.scale}
-                        onChange={e => onChange({ scale: Math.max(0.1, Number(e.target.value)) })}
+                        value={round1(selected.scale)}
+                        onChange={e => onChange({ scale: round1(Math.max(0.1, Number(e.target.value))) })}
                       />
                     </div>
                   )}
+
+                  <div className="prop-field">
+                    <label>Rotazione (°)</label>
+                    <input
+                      type="number"
+                      value={round1(selected.rotation || 0)}
+                      onChange={e => onChange({ rotation: round1(Number(e.target.value)) })}
+                    />
+                  </div>
                 </div>
 
                 {selected.type === 'text' && (
@@ -320,8 +351,8 @@ export function RightPanel({
                         <label>Padding</label>
                         <input
                           type="number"
-                          value={selected.boxPadding || 0}
-                          onChange={e => onChange({ boxPadding: Math.max(0, Number(e.target.value)) })}
+                          value={round1(selected.boxPadding || 0)}
+                          onChange={e => onChange({ boxPadding: round1(Math.max(0, Number(e.target.value))) })}
                         />
                       </div>
                     </div>
@@ -373,16 +404,34 @@ export function RightPanel({
                       <label>Offset X</label>
                       <input
                         type="number"
-                        value={selected.offsetX}
-                        onChange={e => onChange({ offsetX: Number(e.target.value) })}
+                        value={round1(selected.offsetX)}
+                        onChange={e => onChange({ offsetX: round1(Number(e.target.value)) })}
                       />
                     </div>
                     <div className="prop-field">
                       <label>Offset Y</label>
                       <input
                         type="number"
-                        value={selected.offsetY}
-                        onChange={e => onChange({ offsetY: Number(e.target.value) })}
+                        value={round1(selected.offsetY)}
+                        onChange={e => onChange({ offsetY: round1(Number(e.target.value)) })}
+                      />
+                    </div>
+                    <div className="prop-field">
+                      <label>Vista</label>
+                      <select
+                        value={selected.viewType || 'top'}
+                        onChange={e => onChange({ viewType: e.target.value as any })}
+                      >
+                        <option value="top">Pianta (Teste esagonali)</option>
+                        <option value="side">Laterale (Profilo)</option>
+                      </select>
+                    </div>
+                    <div className="prop-field">
+                      <label>Lunghezza Bullone (mm)</label>
+                      <input
+                        type="number"
+                        value={round1(selected.length || 60)}
+                        onChange={e => onChange({ length: round1(Number(e.target.value)) })}
                       />
                     </div>
                   </>
@@ -400,8 +449,8 @@ export function RightPanel({
                       type="number"
                       min="1"
                       max="20"
-                      value={selected.strokeWidth || 2}
-                      onChange={e => onChange({ strokeWidth: Number(e.target.value) })}
+                      value={round1(selected.strokeWidth || 2)}
+                      onChange={e => onChange({ strokeWidth: round1(Number(e.target.value)) })}
                     />
                   </div>
                   <div className="prop-field">

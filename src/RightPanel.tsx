@@ -341,11 +341,26 @@ export function RightPanel({
                     <div className="prop-grid">
                       <div className="prop-field">
                         <label>Colore Testo</label>
-                        <input
-                          type="color"
-                          value={selected.textColor || '#000000'}
-                          onChange={e => onChange({ textColor: e.target.value })}
-                        />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="color"
+                            value={selected.textColor || '#000000'}
+                            onChange={e => onChange({ textColor: e.target.value })}
+                            style={{ padding: 0, height: '24px', width: '24px', cursor: 'pointer' }}
+                          />
+                          {['#0f172a', '#dc2626', '#16a34a', '#2563eb'].map(c => (
+                            <button
+                              key={c}
+                              onClick={() => onChange({ textColor: c })}
+                              style={{
+                                width: '18px', height: '18px', borderRadius: '50%',
+                                background: c, border: `1px solid ${c === '#ffffff' ? '#ccc' : c}`, cursor: 'pointer',
+                                padding: 0
+                              }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
                       </div>
                       <div className="prop-field">
                         <label>Padding</label>
@@ -455,11 +470,26 @@ export function RightPanel({
                   </div>
                   <div className="prop-field">
                     <label>Colore Linea</label>
-                    <input
-                      type="color"
-                      value={selected.stroke || '#0f172a'}
-                      onChange={e => onChange({ stroke: e.target.value })}
-                    />
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="color"
+                        value={selected.stroke || '#0f172a'}
+                        onChange={e => onChange({ stroke: e.target.value })}
+                        style={{ padding: 0, height: '24px', width: '24px', cursor: 'pointer' }}
+                      />
+                      {['#0f172a', '#dc2626', '#16a34a', '#2563eb'].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => onChange({ stroke: c })}
+                          style={{
+                            width: '18px', height: '18px', borderRadius: '50%',
+                            background: c, border: `1px solid ${c === '#ffffff' ? '#ccc' : c}`, cursor: 'pointer',
+                            padding: 0
+                          }}
+                          title={c}
+                        />
+                      ))}
+                    </div>
                   </div>
                   <div className="prop-field">
                     <label>Riempimento</label>
@@ -474,11 +504,26 @@ export function RightPanel({
                   {selected.fillEnabled && (
                     <div className="prop-field">
                       <label>Colore</label>
-                      <input
-                        type="color"
-                        value={selected.fillColor || '#cbd5e1'}
-                        onChange={e => onChange({ fillColor: e.target.value })}
-                      />
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={selected.fillColor || '#cbd5e1'}
+                          onChange={e => onChange({ fillColor: e.target.value })}
+                          style={{ padding: 0, height: '24px', width: '24px', cursor: 'pointer' }}
+                        />
+                        {['#cbd5e1', '#fde047', '#ef4444', '#3b82f6'].map(c => (
+                          <button
+                            key={c}
+                            onClick={() => onChange({ fillColor: c })}
+                            style={{
+                              width: '18px', height: '18px', borderRadius: '50%',
+                              background: c, border: `1px solid ${c === '#ffffff' ? '#ccc' : c}`, cursor: 'pointer',
+                              padding: 0
+                            }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { CanvasObject } from '../types'
 import { ALL_PROFILES } from '../profiles'
-import { getBeamPoints } from '../beamPath'
+import { getBeamPoints, generateBeamPath } from '../beamPath'
 
 /* =========================================
    SVG EXPORT
@@ -56,12 +56,15 @@ export function exportToSVG(objects: CanvasObject[]): string {
             svg += `  <circle cx="${o.x}" cy="${o.y}" r="${o.radius}" stroke="${stroke}" fill="${fill}" />\n`
         } else if (o.type === 'polyline') {
             const ptr = o.points.map(p => `${p.x},${p.y}`).join(' ')
-            svg += `  <polyline points="${ptr}" stroke="${stroke}" fill="${fill}" />\n`
+            if (o.closed) {
+                svg += `  <polygon points="${ptr}" stroke="${stroke}" fill="${fill}" stroke-width="${o.strokeWidth || 2}" />\n`
+            } else {
+                svg += `  <polyline points="${ptr}" stroke="${stroke}" fill="${fill}" stroke-width="${o.strokeWidth || 2}" />\n`
+            }
         } else if (o.type === 'profile') {
             const profile = ALL_PROFILES.find(p => p.name === o.profileName)
             if (profile) {
-                const pts = getBeamPoints(profile)
-                const d = `M ${pts.map(p => `${p.x} ${p.y}`).join(' L ')} Z`
+                const { path: d } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
                 svg += `  <g transform="translate(${o.x}, ${o.y}) scale(${o.scale})"><path d="${d}" stroke="${stroke}" fill="${fill}" vector-effect="non-scaling-stroke" /></g>\n`
             }
         } else if (o.type === 'image') {

@@ -15,7 +15,9 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronsUp,
-  ChevronsDown
+  ChevronsDown,
+  Minus,
+  PenTool
 } from 'lucide-react'
 
 type Props = {
@@ -30,6 +32,10 @@ type Props = {
   setIsArrowMode: Dispatch<SetStateAction<boolean>>
   isBoltMode: boolean
   setIsBoltMode: Dispatch<SetStateAction<boolean>>
+  isLineMode: boolean
+  setIsLineMode: Dispatch<SetStateAction<boolean>>
+  isFreehandMode: boolean
+  setIsFreehandMode: Dispatch<SetStateAction<boolean>>
   drawingPolyline: Point[] | null
   bringToFront: () => void
   sendToBack: () => void
@@ -50,6 +56,10 @@ export function Toolbar({
   isArrowMode,
   setIsBoltMode,
   isBoltMode,
+  isLineMode,
+  setIsLineMode,
+  isFreehandMode,
+  setIsFreehandMode,
   drawingPolyline,
   bringToFront,
   sendToBack,
@@ -158,6 +168,8 @@ export function Toolbar({
     setDrawingPolyline([])
     setIsArrowMode(false)
     setIsBoltMode(false)
+    setIsLineMode(false)
+    setIsFreehandMode(false)
   }
 
   return (
@@ -177,11 +189,39 @@ export function Toolbar({
           <Activity size={20} />
         </button>
         <button
+          className={isLineMode ? 'active' : ''}
+          title="Linea"
+          onClick={() => {
+            setIsLineMode(!isLineMode)
+            setIsFreehandMode(false)
+            setIsArrowMode(false)
+            setIsBoltMode(false)
+            setDrawingPolyline(null)
+          }}
+        >
+          <Minus size={20} />
+        </button>
+        <button
+          className={isFreehandMode ? 'active' : ''}
+          title="Mano Libera"
+          onClick={() => {
+            setIsFreehandMode(!isFreehandMode)
+            setIsLineMode(false)
+            setIsArrowMode(false)
+            setIsBoltMode(false)
+            setDrawingPolyline(null)
+          }}
+        >
+          <PenTool size={20} />
+        </button>
+        <button
           className={isArrowMode ? 'active' : ''}
           title="Freccia"
           onClick={() => {
             setIsArrowMode(!isArrowMode)
             setIsBoltMode(false)
+            setIsLineMode(false)
+            setIsFreehandMode(false)
             setDrawingPolyline(null)
           }}
         >
@@ -193,6 +233,8 @@ export function Toolbar({
           onClick={() => {
             setIsBoltMode(!isBoltMode)
             setIsArrowMode(false)
+            setIsLineMode(false)
+            setIsFreehandMode(false)
             setDrawingPolyline(null)
           }}
         >

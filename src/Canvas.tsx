@@ -33,6 +33,10 @@ type Props = {
   setIsArrowMode: (v: boolean) => void
   isBoltMode: boolean
   setIsBoltMode: (v: boolean) => void
+  isLineMode: boolean
+  setIsLineMode: (v: boolean) => void
+  isFreehandMode: boolean
+  setIsFreehandMode: (v: boolean) => void
 }
 
 type ArrowGrip = { id: string; point: 'p1' | 'p2' }
@@ -57,6 +61,10 @@ export function Canvas({
   setIsArrowMode,
   isBoltMode,
   setIsBoltMode,
+  isLineMode,
+  setIsLineMode,
+  isFreehandMode,
+  setIsFreehandMode,
 }: Props) {
 
 
@@ -131,6 +139,8 @@ export function Canvas({
     p2: Point
   } | null>(null)
 
+  const [drawingLine, setDrawingLine] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
+  const [drawingFreehand, setDrawingFreehand] = useState<Point[] | null>(null)
 
   const snap = (v: number, step: number) =>
     Math.round(v / step) * step
@@ -325,6 +335,31 @@ export function Canvas({
       const wy = (p.y / zoom) + view.y
       const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
       setDrawingBolt(prev => prev ? { ...prev, p2: snapped } : null)
+      return
+    }
+
+    if (drawingLine) {
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      setDrawingLine(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
+      return
+    }
+
+    if (drawingFreehand) {
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      setDrawingFreehand(prev => {
+        if (!prev) return null
+        const last = prev[prev.length - 1]
+        const dist = Math.sqrt((wx - last.x) ** 2 + (wy - last.y) ** 2)
+        if (dist > 2) {
+          return [...prev, { x: wx, y: wy }]
+        }
+        return prev
+      })
       return
     }
 
@@ -650,6 +685,44 @@ export function Canvas({
       setIsBoltMode(false)
     }
 
+    if (drawingLine) {
+      if (Math.abs(drawingLine.x1 - drawingLine.x2) > 2 || Math.abs(drawingLine.y1 - drawingLine.y2) > 2) {
+        const newId = crypto.randomUUID()
+        setObjects(prev => [...prev, {
+          id: newId,
+          type: 'polyline',
+          points: [{ x: drawingLine.x1, y: drawingLine.y1 }, { x: drawingLine.x2, y: drawingLine.y2 }],
+          closed: false,
+          stroke: '#0f172a',
+          fillEnabled: false,
+          fillColor: 'transparent',
+          strokeWidth: 2
+        }])
+        setSelectedId(newId)
+      }
+      setDrawingLine(null)
+      setIsLineMode(false)
+    }
+
+    if (drawingFreehand) {
+      if (drawingFreehand.length > 2) {
+        const newId = crypto.randomUUID()
+        setObjects(prev => [...prev, {
+          id: newId,
+          type: 'polyline',
+          points: drawingFreehand,
+          closed: false,
+          stroke: '#0f172a',
+          fillEnabled: false,
+          fillColor: 'transparent',
+          strokeWidth: 2
+        }])
+        setSelectedId(newId)
+      }
+      setDrawingFreehand(null)
+      setIsFreehandMode(false)
+    }
+
     rotationRef.current = null
     boltGripRef.current = null
     dragRef.current = null
@@ -717,6 +790,23 @@ export function Canvas({
           const wy = (p.y / zoom) + view.y
           const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
           setDrawingBolt({ p1: snapped, p2: snapped })
+          return
+        }
+
+        if (isLineMode) {
+          const p = getSvgPoint(e)
+          const wx = (p.x / zoom) + view.x
+          const wy = (p.y / zoom) + view.y
+          const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          setDrawingLine({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
+          return
+        }
+
+        if (isFreehandMode) {
+          const p = getSvgPoint(e)
+          const wx = (p.x / zoom) + view.x
+          const wy = (p.y / zoom) + view.y
+          setDrawingFreehand([{ x: wx, y: wy }])
           return
         }
 
@@ -802,6 +892,31 @@ export function Canvas({
           />
         )}
 
+        {drawingLine && (
+          <line
+            x1={drawingLine.x1}
+            y1={drawingLine.y1}
+            x2={drawingLine.x2}
+            y2={drawingLine.y2}
+            stroke="#0f172a"
+            strokeWidth={2}
+            pointerEvents="none"
+          />
+        )}
+        
+        {drawingFreehand && (
+          <polyline
+            points={drawingFreehand.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#0f172a"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            pointerEvents="none"
+          />
+        )}
+
+
         {drawingBolt && (
           <g pointerEvents="none">
             <line
@@ -841,7 +956,8 @@ export function Canvas({
           const hasFill = o.fillEnabled
           const fillColor = o.fillColor || '#cbd5e1'
           const strokeValue = isSelected ? '#6366f1' : o.stroke || '#0f172a'
-          const strokeWidth = isSelected ? 2.5 : 1.5
+          const baseStrokeWidth = o.strokeWidth || 1.5
+          const strokeWidth = isSelected ? baseStrokeWidth + 1 : baseStrokeWidth
 
           let finalFill = fillColor
           let finalOpacity = 0
@@ -926,6 +1042,7 @@ export function Canvas({
               o.fillEnabled && o.fillColor ? o.fillColor : (isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent')
 
             const pointerMode = 'all'
+            const polyStrokeWidth = o.strokeWidth || 2
 
             return (
               <g key={o.id} transform={rotateTransform}>
@@ -934,7 +1051,7 @@ export function Canvas({
                   points={o.points.map(p => `${p.x},${p.y}`).join(' ')}
                   fill={fillValue}
                   stroke={strokeValue}
-                  strokeWidth={isSelected ? 4 : 2}
+                  strokeWidth={isSelected ? polyStrokeWidth + 1 : polyStrokeWidth}
                   pointerEvents={basePointerEvents}
                   onMouseDown={e => {
                     e.stopPropagation()

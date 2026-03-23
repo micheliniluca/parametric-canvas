@@ -35,7 +35,7 @@ export type TextObject = BaseObject & {
 
 export type ProfileObject = BaseObject & {
   type: 'profile'
-  profileType: 'IPE' | 'HEA' | 'HEB'
+  profileType: 'IPE' | 'HEA' | 'HEB' | 'RHS' | 'CHS'
   profileName: string
   scale: number
   viewType: 'front' | 'side' | 'top'

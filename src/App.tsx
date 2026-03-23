@@ -23,6 +23,8 @@ export default function App() {
   const [nextBubbleNumber, setNextBubbleNumber] = useState(1)
   const [isArrowMode, setIsArrowMode] = useState(false)
   const [isBoltMode, setIsBoltMode] = useState(false)
+  const [isLineMode, setIsLineMode] = useState(false)
+  const [isFreehandMode, setIsFreehandMode] = useState(false)
 
   const onScreenshot = () => setLastAction('system')
 
@@ -265,6 +267,10 @@ export default function App() {
             setIsArrowMode={setIsArrowMode}
             isBoltMode={isBoltMode}
             setIsBoltMode={setIsBoltMode}
+            isLineMode={isLineMode}
+            setIsLineMode={setIsLineMode}
+            isFreehandMode={isFreehandMode}
+            setIsFreehandMode={setIsFreehandMode}
             drawingPolyline={drawingPolyline}
             bringToFront={bringToFront}
             sendToBack={sendToBack}
@@ -341,6 +347,10 @@ export default function App() {
             setIsArrowMode={setIsArrowMode}
             isBoltMode={isBoltMode}
             setIsBoltMode={setIsBoltMode}
+            isLineMode={isLineMode}
+            setIsLineMode={setIsLineMode}
+            isFreehandMode={isFreehandMode}
+            setIsFreehandMode={setIsFreehandMode}
           />
         </div>
 

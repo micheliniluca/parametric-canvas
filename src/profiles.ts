@@ -5,7 +5,7 @@ export type SteelProfile = {
   tw: number  // web thickness
   tf: number  // flange thickness
   r?: number  // radius (optional for simplified drawing)
-  type: 'IPE' | 'HEA' | 'HEB'
+  type: 'IPE' | 'HEA' | 'HEB' | 'RHS' | 'CHS'
 }
 
 export const IPE_CATALOG: SteelProfile[] = [
@@ -65,4 +65,45 @@ export const HEB_CATALOG: SteelProfile[] = [
   { name: 'HEB 400', h: 400, b: 300, tw: 13.5, tf: 24, type: 'HEB' },
 ]
 
-export const ALL_PROFILES = [...IPE_CATALOG, ...HEA_CATALOG, ...HEB_CATALOG]
+export const RHS_CATALOG: SteelProfile[] = [
+  // Rectangular
+  { name: 'RHS 50x30x3', h: 50, b: 30, tw: 3, tf: 3, type: 'RHS' },
+  { name: 'RHS 60x40x3', h: 60, b: 40, tw: 3, tf: 3, type: 'RHS' },
+  { name: 'RHS 80x40x4', h: 80, b: 40, tw: 4, tf: 4, type: 'RHS' },
+  { name: 'RHS 100x50x4', h: 100, b: 50, tw: 4, tf: 4, type: 'RHS' },
+  { name: 'RHS 120x60x4', h: 120, b: 60, tw: 4, tf: 4, type: 'RHS' },
+  { name: 'RHS 150x100x5', h: 150, b: 100, tw: 5, tf: 5, type: 'RHS' },
+  { name: 'RHS 200x100x6', h: 200, b: 100, tw: 6, tf: 6, type: 'RHS' },
+  { name: 'RHS 250x150x8', h: 250, b: 150, tw: 8, tf: 8, type: 'RHS' },
+  { name: 'RHS 300x200x10', h: 300, b: 200, tw: 10, tf: 10, type: 'RHS' },
+  // Square
+  { name: 'SHS 40x40x3', h: 40, b: 40, tw: 3, tf: 3, type: 'RHS' },
+  { name: 'SHS 50x50x3', h: 50, b: 50, tw: 3, tf: 3, type: 'RHS' },
+  { name: 'SHS 60x60x3', h: 60, b: 60, tw: 3, tf: 3, type: 'RHS' },
+  { name: 'SHS 80x80x4', h: 80, b: 80, tw: 4, tf: 4, type: 'RHS' },
+  { name: 'SHS 100x100x4', h: 100, b: 100, tw: 4, tf: 4, type: 'RHS' },
+  { name: 'SHS 120x120x5', h: 120, b: 120, tw: 5, tf: 5, type: 'RHS' },
+  { name: 'SHS 150x150x5', h: 150, b: 150, tw: 5, tf: 5, type: 'RHS' },
+  { name: 'SHS 200x200x6', h: 200, b: 200, tw: 6, tf: 6, type: 'RHS' },
+  { name: 'SHS 250x250x8', h: 250, b: 250, tw: 8, tf: 8, type: 'RHS' },
+]
+
+export const CHS_CATALOG: SteelProfile[] = [
+  { name: 'CHS 33.7x3', h: 33.7, b: 33.7, tw: 3, tf: 3, type: 'CHS' },
+  { name: 'CHS 42.4x3', h: 42.4, b: 42.4, tw: 3, tf: 3, type: 'CHS' },
+  { name: 'CHS 48.3x3', h: 48.3, b: 48.3, tw: 3, tf: 3, type: 'CHS' },
+  { name: 'CHS 60.3x3', h: 60.3, b: 60.3, tw: 3, tf: 3, type: 'CHS' },
+  { name: 'CHS 76.1x4', h: 76.1, b: 76.1, tw: 4, tf: 4, type: 'CHS' },
+  { name: 'CHS 88.9x4', h: 88.9, b: 88.9, tw: 4, tf: 4, type: 'CHS' },
+  { name: 'CHS 101.6x4', h: 101.6, b: 101.6, tw: 4, tf: 4, type: 'CHS' },
+  { name: 'CHS 114.3x4', h: 114.3, b: 114.3, tw: 4, tf: 4, type: 'CHS' },
+  { name: 'CHS 139.7x5', h: 139.7, b: 139.7, tw: 5, tf: 5, type: 'CHS' },
+  { name: 'CHS 168.3x5', h: 168.3, b: 168.3, tw: 5, tf: 5, type: 'CHS' },
+  { name: 'CHS 193.7x5', h: 193.7, b: 193.7, tw: 5, tf: 5, type: 'CHS' },
+  { name: 'CHS 219.1x6', h: 219.1, b: 219.1, tw: 6, tf: 6, type: 'CHS' },
+  { name: 'CHS 244.5x6', h: 244.5, b: 244.5, tw: 6, tf: 6, type: 'CHS' },
+  { name: 'CHS 273.0x6', h: 273.0, b: 273.0, tw: 6, tf: 6, type: 'CHS' },
+  { name: 'CHS 323.9x8', h: 323.9, b: 323.9, tw: 8, tf: 8, type: 'CHS' },
+]
+
+export const ALL_PROFILES = [...IPE_CATALOG, ...HEA_CATALOG, ...HEB_CATALOG, ...RHS_CATALOG, ...CHS_CATALOG]

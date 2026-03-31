@@ -24,6 +24,7 @@ type Props = {
 
   gridSize: number
   snapEnabled: boolean
+  orthoEnabled: boolean
   zoom: number
   setZoom: Dispatch<SetStateAction<number>>
   screenshotMode: 'grid' | 'white' | 'transparent'
@@ -52,6 +53,7 @@ export function Canvas({
   setView,
   gridSize,
   snapEnabled,
+  orthoEnabled,
   zoom,
   setZoom,
   screenshotMode,
@@ -186,10 +188,26 @@ export function Canvas({
   }
 
   const getSnapPoint = (worldX: number, worldY: number, excludeId?: string): Point => {
-    if (!snapEnabled) return { x: worldX, y: worldY }
-
     // 1. COLLECT CANDIDATES FROM OTHER OBJECTS
     const candidates: Point[] = []
+    
+    let nearestEdgePoint: Point | null = null
+    let minEdgeDist = SNAP_THRESHOLD
+
+    const checkEdge = (p1: Point, p2: Point) => {
+      const l2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+      if (l2 === 0) return;
+      let t = ((worldX - p1.x) * (p2.x - p1.x) + (worldY - p1.y) * (p2.y - p1.y)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = p1.x + t * (p2.x - p1.x);
+      const projY = p1.y + t * (p2.y - p1.y);
+      const dist = Math.sqrt((projX - worldX)**2 + (projY - worldY)**2);
+      if (dist < minEdgeDist) {
+        minEdgeDist = dist;
+        nearestEdgePoint = { x: projX, y: projY };
+      }
+    }
+
     objects.forEach((o: CanvasObject) => {
       if (o.id === excludeId) return
 
@@ -199,43 +217,72 @@ export function Canvas({
       const rotate = (p: Point): Point => rotatePoint(p, center, rotation)
 
       if (o.type === 'rect' || o.type === 'image') {
-        candidates.push(rotate({ x: o.x, y: o.y }))
-        candidates.push(rotate({ x: o.x + o.width, y: o.y }))
-        candidates.push(rotate({ x: o.x, y: o.y + o.height }))
-        candidates.push(rotate({ x: o.x + o.width, y: o.y + o.height }))
+        const p1 = rotate({ x: o.x, y: o.y })
+        const p2 = rotate({ x: o.x + o.width, y: o.y })
+        const p3 = rotate({ x: o.x + o.width, y: o.y + o.height })
+        const p4 = rotate({ x: o.x, y: o.y + o.height })
+        candidates.push(p1, p2, p3, p4) // vertices
+        candidates.push(
+          { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 },
+          { x: (p2.x + p3.x)/2, y: (p2.y + p3.y)/2 },
+          { x: (p3.x + p4.x)/2, y: (p3.y + p4.y)/2 },
+          { x: (p4.x + p1.x)/2, y: (p4.y + p1.y)/2 }
+        ) // midpoints
+        checkEdge(p1, p2)
+        checkEdge(p2, p3)
+        checkEdge(p3, p4)
+        checkEdge(p4, p1)
       } else if (o.type === 'circle') {
         candidates.push({ x: o.x, y: o.y })
       } else if (o.type === 'profile') {
         const profile = ALL_PROFILES.find(p => p.name === o.profileName)
         if (profile) {
           const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
-          pts.forEach((p: Point) => {
-            candidates.push(rotate({
-              x: o.x + p.x * o.scale,
-              y: o.y + p.y * o.scale
-            }))
-          })
+          const rotatedPts = pts.map(p => rotate({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale }))
+          rotatedPts.forEach((p: Point) => candidates.push(p))
+          for (let i = 0; i < rotatedPts.length; i++) {
+            const next = rotatedPts[(i + 1) % rotatedPts.length]
+            candidates.push({ x: (rotatedPts[i].x + next.x)/2, y: (rotatedPts[i].y + next.y)/2 }) // midpoints
+            checkEdge(rotatedPts[i], next)
+          }
         }
       } else if (o.type === 'polyline') {
-        o.points.forEach((p: Point) => candidates.push(rotate(p)))
+        const rotatedPts = o.points.map((p: Point) => rotate(p))
+        rotatedPts.forEach((p: Point) => candidates.push(p))
+        for (let i = 0; i < rotatedPts.length - 1; i++) {
+          candidates.push({ x: (rotatedPts[i].x + rotatedPts[i+1].x)/2, y: (rotatedPts[i].y + rotatedPts[i+1].y)/2 })
+          checkEdge(rotatedPts[i], rotatedPts[i+1])
+        }
+        if (o.closed && rotatedPts.length > 2) {
+            candidates.push({ x: (rotatedPts[rotatedPts.length-1].x + rotatedPts[0].x)/2, y: (rotatedPts[rotatedPts.length-1].y + rotatedPts[0].y)/2 })
+            checkEdge(rotatedPts[rotatedPts.length-1], rotatedPts[0])
+        }
       } else if (o.type === 'bolt') {
         const boltPositions = getBoltPositions(o)
         boltPositions.forEach(bp => candidates.push(rotate(bp)))
       } else if (o.type === 'arrow') {
-        candidates.push(rotate({ x: o.x1, y: o.y1 }))
-        candidates.push(rotate({ x: o.x2, y: o.y2 }))
+        const p1 = rotate({ x: o.x1, y: o.y1 })
+        const p2 = rotate({ x: o.x2, y: o.y2 })
+        candidates.push(p1, p2)
+        candidates.push({ x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 })
+        checkEdge(p1, p2)
       } else if (o.type === 'symbol') {
         candidates.push({ x: o.x, y: o.y })
       }
     })
 
-    // 2. CHECK VERTEX SNAPPING
+    // 2. CHECK VERTEX/MIDPOINT SNAPPING
     for (const c of candidates) {
       const dist = Math.sqrt((c.x - worldX) ** 2 + (c.y - worldY) ** 2)
       if (dist < SNAP_THRESHOLD) return c
     }
 
-    // 3. FALLBACK TO GRID SNAPPING
+    // 3. CHECK EDGE SNAPPING
+    if (nearestEdgePoint) {
+      return nearestEdgePoint
+    }
+
+    // 4. FALLBACK TO GRID SNAPPING
     const gx = snap(worldX, gridSize)
     const gy = snap(worldY, gridSize)
     const gDist = Math.sqrt((gx - worldX) ** 2 + (gy - worldY) ** 2)
@@ -324,7 +371,14 @@ export function Canvas({
       const p = getSvgPoint(e)
       const wx = (p.x / zoom) + view.x
       const wy = (p.y / zoom) + view.y
-      const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      if (orthoEnabled || e.shiftKey) {
+        const dx = snapped.x - drawingArrow.x1
+        const dy = snapped.y - drawingArrow.y1
+        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingArrow.y1
+        else snapped.x = drawingArrow.x1
+      }
       setDrawingArrow(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
       return
     }
@@ -333,7 +387,14 @@ export function Canvas({
       const p = getSvgPoint(e)
       const wx = (p.x / zoom) + view.x
       const wy = (p.y / zoom) + view.y
-      const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      if (orthoEnabled || e.shiftKey) {
+        const dx = snapped.x - drawingBolt.p1.x
+        const dy = snapped.y - drawingBolt.p1.y
+        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingBolt.p1.y
+        else snapped.x = drawingBolt.p1.x
+      }
       setDrawingBolt(prev => prev ? { ...prev, p2: snapped } : null)
       return
     }
@@ -342,7 +403,14 @@ export function Canvas({
       const p = getSvgPoint(e)
       const wx = (p.x / zoom) + view.x
       const wy = (p.y / zoom) + view.y
-      const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      if (orthoEnabled || e.shiftKey) {
+        const dx = snapped.x - drawingLine.x1
+        const dy = snapped.y - drawingLine.y1
+        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingLine.y1
+        else snapped.x = drawingLine.x1
+      }
       setDrawingLine(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
       return
     }
@@ -368,12 +436,23 @@ export function Canvas({
       const p = getSvgPoint(e)
       const wx = (p.x / zoom) + view.x
       const wy = (p.y / zoom) + view.y
-      const snapped = snapEnabled ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
 
       setObjects(objs => objs.map(o => {
         if (o.id !== g.id || o.type !== 'bolt') return o
-        if (g.point === 'p1') return { ...o, p1: snapped, x: snapped.x, y: snapped.y }
-        return { ...o, p2: snapped }
+        let finalX = snapped.x
+        let finalY = snapped.y
+        if (orthoEnabled || e.shiftKey) {
+          const refPoint = g.point === 'p1' ? o.p2 : o.p1
+          const dx = finalX - refPoint.x
+          const dy = finalY - refPoint.y
+          if (Math.abs(dx) > Math.abs(dy)) finalY = refPoint.y
+          else finalX = refPoint.x
+        }
+        
+        if (g.point === 'p1') return { ...o, p1: { x: finalX, y: finalY }, x: finalX, y: finalY }
+        return { ...o, p2: { x: finalX, y: finalY } }
       }))
       return
     }
@@ -405,12 +484,24 @@ export function Canvas({
       const p = getSvgPoint(e)
       const wx = (p.x / zoom) + view.x
       const wy = (p.y / zoom) + view.y
-      const snapped = snapEnabled ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
 
       setObjects(objs => objs.map(o => {
         if (o.id !== g.id || o.type !== 'arrow') return o
-        if (g.point === 'p1') return { ...o, x1: snapped.x, y1: snapped.y }
-        return { ...o, x2: snapped.x, y2: snapped.y }
+        let finalX = snapped.x
+        let finalY = snapped.y
+        if (orthoEnabled || e.shiftKey) {
+          const startX = g.point === 'p1' ? o.x2 : o.x1
+          const startY = g.point === 'p1' ? o.y2 : o.y1
+          const dx = finalX - startX
+          const dy = finalY - startY
+          if (Math.abs(dx) > Math.abs(dy)) finalY = startY
+          else finalX = startX
+        }
+        
+        if (g.point === 'p1') return { ...o, x1: finalX, y1: finalY }
+        return { ...o, x2: finalX, y2: finalY }
       }))
       return
     }
@@ -432,7 +523,7 @@ export function Canvas({
       const wx_raw = (p.x / zoom) + view.x
       const wy_raw = (p.y / zoom) + view.y
 
-      const shouldSnap = snapEnabled || e.shiftKey
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
       const snapped = shouldSnap ? getSnapPoint(wx_raw, wy_raw, id) : { x: wx_raw, y: wy_raw }
       const wx = snapped.x
       const wy = snapped.y
@@ -501,10 +592,23 @@ export function Canvas({
           const newPoints = pts.map((pt, i) => {
             const wx = (p.x / zoom) + view.x
             const wy = (p.y / zoom) + view.y
-            const shouldSnap = snapEnabled || (e as any).shiftKey
-            const snapped = shouldSnap ? getSnapPoint(wx, wy, id) : { x: wx, y: wy }
-
-            if (i === index) return snapped
+            const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+            let snapped = shouldSnap ? getSnapPoint(wx, wy, id) : { x: wx, y: wy }
+            
+            if (i === index) {
+              if (orthoEnabled || (e as any).shiftKey) {
+                // Determine previous and next points, if we want strict ortho we need a reference point.
+                // Normally a polyline grip is orthogonal to the previous point, or we just pick the previous point as reference.
+                const refPt = i > 0 ? pts[i - 1] : (pts.length > 1 ? pts[i + 1] : null)
+                if (refPt) {
+                  const dx = snapped.x - refPt.x
+                  const dy = snapped.y - refPt.y
+                  if (Math.abs(dx) > Math.abs(dy)) snapped.y = refPt.y
+                  else snapped.x = refPt.x
+                }
+              }
+              return snapped
+            }
             if (isClosed) {
               if (index === 0 && i === lastIndex) return snapped
               if (index === lastIndex && i === 0) return snapped
@@ -520,7 +624,7 @@ export function Canvas({
 
     if (symbolGripRef.current) {
       const g = symbolGripRef.current
-      const shouldSnap = snapEnabled || e.shiftKey
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
       setObjects(objs =>
         objs.map(o => {
           if (o.id !== g.id || o.type !== 'symbol' || !o.points) return o
@@ -554,7 +658,7 @@ export function Canvas({
     const dy_world = dy_screen / zoom
 
     // Decide if we snap
-    const shouldSnap = snapEnabled || e.shiftKey
+    const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
 
     setObjects(prevObjects =>
       prevObjects.map(o => {
@@ -585,6 +689,13 @@ export function Canvas({
           const snapDiffY = snappedMouse.y - rawMouseY
           snappedX = rawNewX + snapDiffX
           snappedY = rawNewY + snapDiffY
+        }
+        
+        if (orthoEnabled || e.shiftKey) {
+          const dx = snappedX - d.initialX
+          const dy = snappedY - d.initialY
+          if (Math.abs(dx) > Math.abs(dy)) snappedY = d.initialY
+          else snappedX = d.initialX
         }
 
         // Apply changes based on object type
@@ -779,7 +890,8 @@ export function Canvas({
           const p = getSvgPoint(e)
           const wx = (p.x / zoom) + view.x
           const wy = (p.y / zoom) + view.y
-          const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
           setDrawingArrow({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
           return
         }
@@ -788,7 +900,8 @@ export function Canvas({
           const p = getSvgPoint(e)
           const wx = (p.x / zoom) + view.x
           const wy = (p.y / zoom) + view.y
-          const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
           setDrawingBolt({ p1: snapped, p2: snapped })
           return
         }
@@ -797,7 +910,8 @@ export function Canvas({
           const p = getSvgPoint(e)
           const wx = (p.x / zoom) + view.x
           const wy = (p.y / zoom) + view.y
-          const snapped = snapEnabled ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
           setDrawingLine({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
           return
         }

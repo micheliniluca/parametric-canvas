@@ -26,6 +26,8 @@ type Props = {
   setGridSize: (v: number) => void
   snapEnabled: boolean
   setSnapEnabled: (v: boolean) => void
+  orthoEnabled: boolean
+  setOrthoEnabled: (v: boolean) => void
   screenshotMode: 'grid' | 'white' | 'transparent'
   setScreenshotMode: (mode: 'grid' | 'white' | 'transparent') => void
   onScreenshot: () => void
@@ -43,6 +45,8 @@ export function RightPanel({
   setGridSize,
   snapEnabled,
   setSnapEnabled,
+  orthoEnabled,
+  setOrthoEnabled,
   screenshotMode,
   setScreenshotMode,
   onScreenshot,
@@ -102,6 +106,16 @@ export function RightPanel({
                 type="checkbox"
                 checked={snapEnabled}
                 onChange={e => setSnapEnabled(e.target.checked)}
+              />
+            </div>
+          </div>
+          <div className="prop-field">
+            <label>Ortho</label>
+            <div className="checkbox-wrapper">
+              <input
+                type="checkbox"
+                checked={orthoEnabled}
+                onChange={e => setOrthoEnabled(e.target.checked)}
               />
             </div>
           </div>

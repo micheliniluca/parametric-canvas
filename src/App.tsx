@@ -17,6 +17,7 @@ export default function App() {
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [gridSize, setGridSize] = useState(50)
   const [snapEnabled, setSnapEnabled] = useState(false)
+  const [orthoEnabled, setOrthoEnabled] = useState(false)
   const [zoom, setZoom] = useState(1.0)
   const [screenshotMode, setScreenshotMode] = useState<'grid' | 'white' | 'transparent'>('grid')
   const [lastAction, setLastAction] = useState<'internal' | 'system'>('internal')
@@ -315,6 +316,8 @@ export default function App() {
                 setGridSize={setGridSize}
                 snapEnabled={snapEnabled}
                 setSnapEnabled={setSnapEnabled}
+                orthoEnabled={orthoEnabled}
+                setOrthoEnabled={setOrthoEnabled}
                 screenshotMode={screenshotMode}
                 setScreenshotMode={setScreenshotMode}
                 onScreenshot={onScreenshot}
@@ -338,6 +341,7 @@ export default function App() {
             setView={setView}
             gridSize={gridSize}
             snapEnabled={snapEnabled}
+            orthoEnabled={orthoEnabled}
             zoom={zoom}
             setZoom={setZoom}
             screenshotMode={screenshotMode}

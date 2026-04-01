@@ -163,6 +163,20 @@ export function Canvas({
   const [drawingMeasure, setDrawingMeasure] = useState<Point | null>(null)
   const [measureResult, setMeasureResult] = useState<{ p1: Point, p2: Point, distance: number } | null>(null)
 
+  useEffect(() => {
+    if (!isArrowMode) setDrawingArrow(null)
+    if (!isBoltMode) setDrawingBolt(null)
+    if (!isLineMode) setDrawingLine(null)
+    if (!isFreehandMode) setDrawingFreehand(null)
+    if (!isQuoteMode) setDrawingQuote(null)
+    if (!isMeasureMode) {
+      setMeasureStart(null)
+      setDrawingMeasure(null)
+      setMeasureResult(null)
+    }
+  }, [isArrowMode, isBoltMode, isLineMode, isFreehandMode, isQuoteMode, isMeasureMode])
+
+
   const quoteGripRef = useRef<{ id: string; point: 'p1' | 'p2' } | null>(null)
 
   const snap = (v: number, step: number) =>
@@ -915,25 +929,7 @@ export function Canvas({
       setIsFreehandMode(false)
     }
 
-    if (drawingQuote) {
-      if (Math.abs(drawingQuote.x1 - drawingQuote.x2) > 5 || Math.abs(drawingQuote.y1 - drawingQuote.y2) > 5) {
-        const newId = crypto.randomUUID()
-        setObjects(prev => [...prev, {
-          id: newId,
-          type: 'quote',
-          x1: drawingQuote.x1,
-          y1: drawingQuote.y1,
-          x2: drawingQuote.x2,
-          y2: drawingQuote.y2,
-          stroke: '#000000',
-          strokeWidth: 1,
-          x: 0, y: 0 // base props
-        }])
-        setSelectedId(null)
-      }
-      setDrawingQuote(null)
-      setIsQuoteMode(false)
-    }
+
 
     rotationRef.current = null
     boltGripRef.current = null
@@ -1024,8 +1020,35 @@ export function Canvas({
           const wx = (p.x / zoom) + view.x
           const wy = (p.y / zoom) + view.y
           const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          setDrawingQuote({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
+          let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          
+          if (!drawingQuote) {
+            setDrawingQuote({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
+          } else {
+             if (orthoEnabled || e.shiftKey) {
+                 const dx = snapped.x - drawingQuote.x1
+                 const dy = snapped.y - drawingQuote.y1
+                 if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingQuote.y1
+                 else snapped.x = drawingQuote.x1
+             }
+             if (Math.abs(drawingQuote.x1 - snapped.x) > 5 || Math.abs(drawingQuote.y1 - snapped.y) > 5) {
+                 const newId = crypto.randomUUID()
+                 setObjects(prev => [...prev, {
+                     id: newId,
+                     type: 'quote',
+                     x1: drawingQuote.x1,
+                     y1: drawingQuote.y1,
+                     x2: snapped.x,
+                     y2: snapped.y,
+                     stroke: '#000000',
+                     strokeWidth: 1,
+                     x: 0, y: 0 // base props
+                 }])
+                 setSelectedId(null)
+             }
+             setDrawingQuote(null)
+             setIsQuoteMode(false)
+          }
           return
         }
 

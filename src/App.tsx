@@ -26,6 +26,8 @@ export default function App() {
   const [isBoltMode, setIsBoltMode] = useState(false)
   const [isLineMode, setIsLineMode] = useState(false)
   const [isFreehandMode, setIsFreehandMode] = useState(false)
+  const [isQuoteMode, setIsQuoteMode] = useState(false)
+  const [isMeasureMode, setIsMeasureMode] = useState(false)
 
   const onScreenshot = () => setLastAction('system')
 
@@ -53,6 +55,19 @@ export default function App() {
       // Avoid shortcuts if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return
+      }
+
+      // ESCAPE (Deselect & Exit Modes)
+      if (e.key === 'Escape') {
+        setSelectedId(null)
+        setDrawingPolyline(null)
+        setIsArrowMode(false)
+        setIsBoltMode(false)
+        setIsLineMode(false)
+        setIsFreehandMode(false)
+        setIsQuoteMode(false)
+        setIsMeasureMode(false)
+        e.preventDefault()
       }
 
       // DELETE
@@ -272,6 +287,10 @@ export default function App() {
             setIsLineMode={setIsLineMode}
             isFreehandMode={isFreehandMode}
             setIsFreehandMode={setIsFreehandMode}
+            isQuoteMode={isQuoteMode}
+            setIsQuoteMode={setIsQuoteMode}
+            isMeasureMode={isMeasureMode}
+            setIsMeasureMode={setIsMeasureMode}
             drawingPolyline={drawingPolyline}
             bringToFront={bringToFront}
             sendToBack={sendToBack}
@@ -355,6 +374,10 @@ export default function App() {
             setIsLineMode={setIsLineMode}
             isFreehandMode={isFreehandMode}
             setIsFreehandMode={setIsFreehandMode}
+            isQuoteMode={isQuoteMode}
+            setIsQuoteMode={setIsQuoteMode}
+            isMeasureMode={isMeasureMode}
+            setIsMeasureMode={setIsMeasureMode}
           />
         </div>
 

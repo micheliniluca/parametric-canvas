@@ -38,6 +38,10 @@ type Props = {
   setIsLineMode: (v: boolean) => void
   isFreehandMode: boolean
   setIsFreehandMode: (v: boolean) => void
+  isQuoteMode: boolean
+  setIsQuoteMode: (v: boolean) => void
+  isMeasureMode: boolean
+  setIsMeasureMode: (v: boolean) => void
 }
 
 type ArrowGrip = { id: string; point: 'p1' | 'p2' }
@@ -67,6 +71,10 @@ export function Canvas({
   setIsLineMode,
   isFreehandMode,
   setIsFreehandMode,
+  isQuoteMode,
+  setIsQuoteMode,
+  isMeasureMode,
+  setIsMeasureMode,
 }: Props) {
 
 
@@ -136,6 +144,13 @@ export function Canvas({
     y2: number
   } | null>(null)
 
+  const [drawingQuote, setDrawingQuote] = useState<{
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  } | null>(null)
+
   const [drawingBolt, setDrawingBolt] = useState<{
     p1: Point
     p2: Point
@@ -143,6 +158,12 @@ export function Canvas({
 
   const [drawingLine, setDrawingLine] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
   const [drawingFreehand, setDrawingFreehand] = useState<Point[] | null>(null)
+  
+  const [measureStart, setMeasureStart] = useState<Point | null>(null)
+  const [drawingMeasure, setDrawingMeasure] = useState<Point | null>(null)
+  const [measureResult, setMeasureResult] = useState<{ p1: Point, p2: Point, distance: number } | null>(null)
+
+  const quoteGripRef = useRef<{ id: string; point: 'p1' | 'p2' } | null>(null)
 
   const snap = (v: number, step: number) =>
     Math.round(v / step) * step
@@ -172,7 +193,7 @@ export function Canvas({
       if (o.viewType === 'front') return { x: o.x, y: o.y }
       return { x: o.x + (o.length / 2) * o.scale, y: o.y }
     }
-    if (o.type === 'arrow') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
+    if (o.type === 'arrow' || o.type === 'quote') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
     if (o.type === 'bolt') return { x: (o.p1.x + o.p2.x) / 2, y: (o.p1.y + o.p2.y) / 2 }
     if (o.type === 'symbol') return { x: o.x, y: o.y }
     if (o.type === 'polyline') {
@@ -260,7 +281,7 @@ export function Canvas({
       } else if (o.type === 'bolt') {
         const boltPositions = getBoltPositions(o)
         boltPositions.forEach(bp => candidates.push(rotate(bp)))
-      } else if (o.type === 'arrow') {
+      } else if (o.type === 'arrow' || o.type === 'quote') {
         const p1 = rotate({ x: o.x1, y: o.y1 })
         const p2 = rotate({ x: o.x2, y: o.y2 })
         candidates.push(p1, p2)
@@ -338,7 +359,7 @@ export function Canvas({
     const worldX = (p.x / zoom) + view.x
     const worldY = (p.y / zoom) + view.y
 
-    const refPoint = o.type === 'polyline' ? o.points[0] : (o.type === 'arrow' ? { x: o.x1, y: o.y1 } : (o.type === 'bolt' ? o.p1 : o))
+    const refPoint = o.type === 'polyline' ? o.points[0] : ((o.type === 'arrow' || o.type === 'quote') ? { x: o.x1, y: o.y1 } : (o.type === 'bolt' ? o.p1 : o))
 
     dragRef.current = {
       id: o.id,
@@ -349,10 +370,10 @@ export function Canvas({
       initialX: refPoint.x,
       initialY: refPoint.y,
       initialPoints: o.type === 'polyline' ? o.points : undefined,
-      initialX1: o.type === 'arrow' ? o.x1 : undefined,
-      initialY1: o.type === 'arrow' ? o.y1 : undefined,
-      initialX2: o.type === 'arrow' ? o.y2 : undefined,
-      initialY2: o.type === 'arrow' ? o.y2 : undefined,
+      initialX1: (o.type === 'arrow' || o.type === 'quote') ? o.x1 : undefined,
+      initialY1: (o.type === 'arrow' || o.type === 'quote') ? o.y1 : undefined,
+      initialX2: (o.type === 'arrow' || o.type === 'quote') ? o.x2 : undefined,
+      initialY2: (o.type === 'arrow' || o.type === 'quote') ? o.y2 : undefined,
       initialP1: o.type === 'bolt' ? o.p1 : undefined,
       initialP2: o.type === 'bolt' ? o.p2 : undefined,
     }
@@ -380,6 +401,38 @@ export function Canvas({
         else snapped.x = drawingArrow.x1
       }
       setDrawingArrow(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
+      return
+    }
+
+    if (drawingQuote) {
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      if (orthoEnabled || e.shiftKey) {
+        const dx = snapped.x - drawingQuote.x1
+        const dy = snapped.y - drawingQuote.y1
+        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingQuote.y1
+        else snapped.x = drawingQuote.x1
+      }
+      setDrawingQuote(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
+      return
+    }
+
+    if (isMeasureMode && measureStart && !measureResult) {
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+      if (orthoEnabled || e.shiftKey) {
+        const dx = snapped.x - measureStart.x
+        const dy = snapped.y - measureStart.y
+        if (Math.abs(dx) > Math.abs(dy)) snapped.y = measureStart.y
+        else snapped.x = measureStart.x
+      }
+      setDrawingMeasure(snapped)
       return
     }
 
@@ -489,6 +542,33 @@ export function Canvas({
 
       setObjects(objs => objs.map(o => {
         if (o.id !== g.id || o.type !== 'arrow') return o
+        let finalX = snapped.x
+        let finalY = snapped.y
+        if (orthoEnabled || e.shiftKey) {
+          const startX = g.point === 'p1' ? o.x2 : o.x1
+          const startY = g.point === 'p1' ? o.y2 : o.y1
+          const dx = finalX - startX
+          const dy = finalY - startY
+          if (Math.abs(dx) > Math.abs(dy)) finalY = startY
+          else finalX = startX
+        }
+        
+        if (g.point === 'p1') return { ...o, x1: finalX, y1: finalY }
+        return { ...o, x2: finalX, y2: finalY }
+      }))
+      return
+    }
+
+    if (quoteGripRef.current) {
+      const g = quoteGripRef.current
+      const p = getSvgPoint(e)
+      const wx = (p.x / zoom) + view.x
+      const wy = (p.y / zoom) + view.y
+      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
+
+      setObjects(objs => objs.map(o => {
+        if (o.id !== g.id || o.type !== 'quote') return o
         let finalX = snapped.x
         let finalY = snapped.y
         if (orthoEnabled || e.shiftKey) {
@@ -712,7 +792,7 @@ export function Canvas({
           }
         }
 
-        if (o.type === 'arrow') {
+        if (o.type === 'arrow' || o.type === 'quote') {
           const finalDX = snappedX - d.initialX
           const finalDY = snappedY - d.initialY
           if (d.initialX1 === undefined || d.initialY1 === undefined || d.initialX2 === undefined || d.initialY2 === undefined) return o
@@ -761,7 +841,7 @@ export function Canvas({
           strokeWidth: 2,
           x: 0, y: 0 // base props
         }])
-        setSelectedId(newId)
+        setSelectedId(null)
       }
       setDrawingArrow(null)
       setIsArrowMode(false)
@@ -794,6 +874,7 @@ export function Canvas({
       ])
       setDrawingBolt(null)
       setIsBoltMode(false)
+      setSelectedId(null)
     }
 
     if (drawingLine) {
@@ -809,7 +890,7 @@ export function Canvas({
           fillColor: 'transparent',
           strokeWidth: 2
         }])
-        setSelectedId(newId)
+        setSelectedId(null)
       }
       setDrawingLine(null)
       setIsLineMode(false)
@@ -828,14 +909,35 @@ export function Canvas({
           fillColor: 'transparent',
           strokeWidth: 2
         }])
-        setSelectedId(newId)
+        setSelectedId(null)
       }
       setDrawingFreehand(null)
       setIsFreehandMode(false)
     }
 
+    if (drawingQuote) {
+      if (Math.abs(drawingQuote.x1 - drawingQuote.x2) > 5 || Math.abs(drawingQuote.y1 - drawingQuote.y2) > 5) {
+        const newId = crypto.randomUUID()
+        setObjects(prev => [...prev, {
+          id: newId,
+          type: 'quote',
+          x1: drawingQuote.x1,
+          y1: drawingQuote.y1,
+          x2: drawingQuote.x2,
+          y2: drawingQuote.y2,
+          stroke: '#000000',
+          strokeWidth: 1,
+          x: 0, y: 0 // base props
+        }])
+        setSelectedId(null)
+      }
+      setDrawingQuote(null)
+      setIsQuoteMode(false)
+    }
+
     rotationRef.current = null
     boltGripRef.current = null
+    quoteGripRef.current = null
     dragRef.current = null
     resizeRef.current = null
     polylineGripRef.current = null
@@ -876,7 +978,8 @@ export function Canvas({
   }
 
   return (
-    <svg
+    <>
+      <svg
       ref={svgRef}
       className="canvas"
       width="100%"
@@ -913,6 +1016,43 @@ export function Canvas({
           const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
           const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
           setDrawingLine({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
+          return
+        }
+
+        if (isQuoteMode) {
+          const p = getSvgPoint(e)
+          const wx = (p.x / zoom) + view.x
+          const wy = (p.y / zoom) + view.y
+          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          setDrawingQuote({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
+          return
+        }
+
+        if (isMeasureMode) {
+          const p = getSvgPoint(e)
+          const wx = (p.x / zoom) + view.x
+          const wy = (p.y / zoom) + view.y
+          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
+          let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
+          
+          if (!measureStart) {
+            setMeasureStart(snapped)
+            setDrawingMeasure(snapped)
+          } else {
+             if (orthoEnabled || e.shiftKey) {
+               const dx = snapped.x - measureStart.x
+               const dy = snapped.y - measureStart.y
+               if (Math.abs(dx) > Math.abs(dy)) snapped.y = measureStart.y
+               else snapped.x = measureStart.x
+             }
+             // Finish measure
+             const dist = Math.sqrt((snapped.x - measureStart.x)**2 + (snapped.y - measureStart.y)**2)
+             setMeasureResult({ p1: measureStart, p2: snapped, distance: dist })
+             setMeasureStart(null)
+             setDrawingMeasure(null)
+             setIsMeasureMode(false)
+          }
           return
         }
 
@@ -972,7 +1112,7 @@ export function Canvas({
         ])
 
         setDrawingPolyline(null)
-        setSelectedId(newId)
+        setSelectedId(null)
       }}
     >
       <defs />
@@ -1018,6 +1158,32 @@ export function Canvas({
           />
         )}
         
+        {drawingQuote && (
+          <line
+            x1={drawingQuote.x1}
+            y1={drawingQuote.y1}
+            x2={drawingQuote.x2}
+            y2={drawingQuote.y2}
+            stroke="#000000"
+            strokeWidth={1}
+            strokeDasharray="4,4"
+            pointerEvents="none"
+          />
+        )}
+        
+        {drawingMeasure && measureStart && (
+          <line
+            x1={measureStart.x}
+            y1={measureStart.y}
+            x2={drawingMeasure.x}
+            y2={drawingMeasure.y}
+            stroke="red"
+            strokeWidth={1}
+            strokeDasharray="4,4"
+            pointerEvents="none"
+          />
+        )}
+
         {drawingFreehand && (
           <polyline
             points={drawingFreehand.map(p => `${p.x},${p.y}`).join(' ')}
@@ -1063,7 +1229,7 @@ export function Canvas({
         {/* oggetti */}
         {objects.map(o => {
           const isSelected = o.id === selectedId
-          const isCreationMode = isArrowMode || isBoltMode || !!drawingPolyline
+          const isCreationMode = isArrowMode || isBoltMode || isLineMode || isFreehandMode || isQuoteMode || isMeasureMode || !!drawingPolyline
           const basePointerEvents = isCreationMode ? 'none' : 'all'
 
           // Use explicit fill or fillOpacity=0 for hit testing
@@ -1324,6 +1490,51 @@ export function Canvas({
                         arrowGripRef.current = { id: o.id, point: 'p2' }
                       }}
                     />
+                  </>
+                )}
+              </g>
+            )
+          }
+
+          if (o.type === 'quote') {
+            const isSelected = o.id === selectedId
+            const color = isSelected ? 'orange' : (o.stroke || '#000000')
+            const sw = o.strokeWidth || 1
+            const dx = o.x2 - o.x1
+            const dy = o.y2 - o.y1
+            const angle = Math.atan2(dy, dx)
+            const angleDeg = angle * (180 / Math.PI)
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            const displayDist = Math.round(dist * 10) / 10
+            const textValue = o.text || `${displayDist}`
+            
+            const tick = 6 + sw * 2
+            
+            return (
+              <g key={o.id} transform={rotateTransform}>
+                {/* Hit area */}
+                <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent" strokeWidth={Math.max(15, sw + 10)} style={{ pointerEvents: basePointerEvents }} onMouseDown={(e) => onObjectMouseDown(e, o)} cursor="pointer" />
+                
+                {/* Main line */}
+                <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke={color} strokeWidth={sw} pointerEvents="none" />
+                
+                {/* Ticks */}
+                <g transform={`translate(${o.x1}, ${o.y1}) rotate(${angleDeg})`} pointerEvents="none">
+                   <line x1={0} y1={-tick} x2={0} y2={tick} stroke={color} strokeWidth={sw} />
+                </g>
+                <g transform={`translate(${o.x2}, ${o.y2}) rotate(${angleDeg})`} pointerEvents="none">
+                   <line x1={0} y1={-tick} x2={0} y2={tick} stroke={color} strokeWidth={sw} />
+                </g>
+                
+                {/* Text centered */}
+                <g transform={`translate(${(o.x1+o.x2)/2}, ${(o.y1+o.y2)/2}) rotate(${angleDeg})`} pointerEvents="none">
+                  <text x={0} y={- (4 + sw)} fill={o.textColor || color} fontSize={14} textAnchor="middle" dominantBaseline="auto" pointerEvents="none">{textValue}</text>
+                </g>
+
+                {isSelected && (
+                  <>
+                    <circle cx={o.x1} cy={o.y1} r={6} fill="white" stroke="black" cursor="move" onMouseDown={e => { e.stopPropagation(); quoteGripRef.current = { id: o.id, point: 'p1' } }} />
+                    <circle cx={o.x2} cy={o.y2} r={6} fill="white" stroke="black" cursor="move" onMouseDown={e => { e.stopPropagation(); quoteGripRef.current = { id: o.id, point: 'p2' } }} />
                   </>
                 )}
               </g>
@@ -1616,5 +1827,47 @@ export function Canvas({
         )}
       </g>
     </svg>
+    {measureResult && (
+      <div style={{
+          position: 'absolute',
+          top: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'white',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          border: '1px solid #e2e8f0',
+          zIndex: 100,
+          display: 'flex',
+          gap: '24px',
+          alignItems: 'center'
+        }}>
+        <div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>Distanza Misurata</div>
+          <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#0f172a' }}>{Math.round(measureResult.distance * 10) / 10} mm</div>
+        </div>
+        <button
+          onClick={() => setMeasureResult(null)}
+          title="Chiudi"
+          style={{
+            border: 'none',
+            background: '#f1f5f9',
+            color: '#64748b',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            fontSize: '1rem',
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    )}
+    </>
   )
 }

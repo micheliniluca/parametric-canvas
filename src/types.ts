@@ -1,7 +1,6 @@
-
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote'
   x: number
   y: number
   stroke?: string
@@ -9,6 +8,16 @@ export type BaseObject = {
   fillColor?: string
   fillEnabled?: boolean
   rotation?: number // Degrees
+}
+
+export type QuoteObject = BaseObject & {
+  type: 'quote'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  text?: string // Custom text override
+  textColor?: string
 }
 
 export type RectObject = BaseObject & {
@@ -94,4 +103,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject

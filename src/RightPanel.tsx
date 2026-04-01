@@ -333,14 +333,16 @@ export function RightPanel({
                     </div>
                   )}
 
-                  <div className="prop-field">
-                    <label>Rotazione (°)</label>
-                    <input
-                      type="number"
-                      value={round1(selected.rotation || 0)}
-                      onChange={e => onChange({ rotation: round1(Number(e.target.value)) })}
-                    />
-                  </div>
+                  {selected.type !== 'quote' && (
+                    <div className="prop-field">
+                      <label>Rotazione (°)</label>
+                      <input
+                        type="number"
+                        value={round1(selected.rotation || 0)}
+                        onChange={e => onChange({ rotation: round1(Number(e.target.value)) })}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {selected.type === 'text' && (
@@ -393,6 +395,44 @@ export function RightPanel({
                           checked={selected.boxEnabled}
                           onChange={e => onChange({ boxEnabled: e.target.checked })}
                         />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {selected.type === 'quote' && (
+                  <>
+                    <div className="prop-field full-width" style={{ marginTop: '12px' }}>
+                      <label>Testo Sovrascritto (Opzionale)</label>
+                      <input
+                        type="text"
+                        value={(selected as any).text || ''}
+                        onChange={e => onChange({ text: e.target.value })}
+                        placeholder="Misura Dinamica"
+                        style={{ padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)', width: '100%', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div className="prop-field">
+                      <label>Colore Testo</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={(selected as any).textColor || '#000000'}
+                          onChange={e => onChange({ textColor: e.target.value })}
+                          style={{ padding: 0, height: '24px', width: '24px', cursor: 'pointer' }}
+                        />
+                        {['#000000', '#dc2626', '#16a34a', '#2563eb'].map(c => (
+                          <button
+                            key={c}
+                            onClick={() => onChange({ textColor: c })}
+                            style={{
+                              width: '18px', height: '18px', borderRadius: '50%',
+                              background: c, border: `1px solid ${c === '#ffffff' ? '#ccc' : c}`, cursor: 'pointer',
+                              padding: 0
+                            }}
+                            title={c}
+                          />
+                        ))}
                       </div>
                     </div>
                   </>

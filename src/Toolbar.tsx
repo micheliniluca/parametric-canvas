@@ -17,7 +17,9 @@ import {
   ChevronsUp,
   ChevronsDown,
   Minus,
-  PenTool
+  PenTool,
+  Ruler,
+  ArrowLeftRight
 } from 'lucide-react'
 
 type Props = {
@@ -36,6 +38,10 @@ type Props = {
   setIsLineMode: Dispatch<SetStateAction<boolean>>
   isFreehandMode: boolean
   setIsFreehandMode: Dispatch<SetStateAction<boolean>>
+  isQuoteMode: boolean
+  setIsQuoteMode: Dispatch<SetStateAction<boolean>>
+  isMeasureMode: boolean
+  setIsMeasureMode: Dispatch<SetStateAction<boolean>>
   drawingPolyline: Point[] | null
   bringToFront: () => void
   sendToBack: () => void
@@ -60,6 +66,10 @@ export function Toolbar({
   setIsLineMode,
   isFreehandMode,
   setIsFreehandMode,
+  isQuoteMode,
+  setIsQuoteMode,
+  isMeasureMode,
+  setIsMeasureMode,
   drawingPolyline,
   bringToFront,
   sendToBack,
@@ -170,6 +180,8 @@ export function Toolbar({
     setIsBoltMode(false)
     setIsLineMode(false)
     setIsFreehandMode(false)
+    setIsQuoteMode(false)
+    setIsMeasureMode(false)
   }
 
   return (
@@ -196,6 +208,8 @@ export function Toolbar({
             setIsFreehandMode(false)
             setIsArrowMode(false)
             setIsBoltMode(false)
+            setIsQuoteMode(false)
+            setIsMeasureMode(false)
             setDrawingPolyline(null)
           }}
         >
@@ -209,6 +223,8 @@ export function Toolbar({
             setIsLineMode(false)
             setIsArrowMode(false)
             setIsBoltMode(false)
+            setIsQuoteMode(false)
+            setIsMeasureMode(false)
             setDrawingPolyline(null)
           }}
         >
@@ -222,6 +238,8 @@ export function Toolbar({
             setIsBoltMode(false)
             setIsLineMode(false)
             setIsFreehandMode(false)
+            setIsQuoteMode(false)
+            setIsMeasureMode(false)
             setDrawingPolyline(null)
           }}
         >
@@ -235,10 +253,42 @@ export function Toolbar({
             setIsArrowMode(false)
             setIsLineMode(false)
             setIsFreehandMode(false)
+            setIsQuoteMode(false)
+            setIsMeasureMode(false)
             setDrawingPolyline(null)
           }}
         >
           <CircleDot size={20} />
+        </button>
+        <button
+          className={isQuoteMode ? 'active' : ''}
+          title="Quota"
+          onClick={() => {
+            setIsQuoteMode(!isQuoteMode)
+            setIsMeasureMode(false)
+            setIsBoltMode(false)
+            setIsArrowMode(false)
+            setIsLineMode(false)
+            setIsFreehandMode(false)
+            setDrawingPolyline(null)
+          }}
+        >
+          <ArrowLeftRight size={20} />
+        </button>
+        <button
+          className={isMeasureMode ? 'active' : ''}
+          title="Misura (Dimensione)"
+          onClick={() => {
+            setIsMeasureMode(!isMeasureMode)
+            setIsQuoteMode(false)
+            setIsBoltMode(false)
+            setIsArrowMode(false)
+            setIsLineMode(false)
+            setIsFreehandMode(false)
+            setDrawingPolyline(null)
+          }}
+        >
+          <Ruler size={20} />
         </button>
       </div>
 

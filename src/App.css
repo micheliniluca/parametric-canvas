@@ -52,9 +52,9 @@
 }
 
 .toolbar button.active {
-  background: white;
-  border-color: var(--border-color);
-  color: var(--primary);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
   box-shadow: var(--shadow-sm);
 }
 

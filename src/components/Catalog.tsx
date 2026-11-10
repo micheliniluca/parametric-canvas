@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { IPE_CATALOG, HEA_CATALOG, HEB_CATALOG, RHS_CATALOG, CHS_CATALOG, SteelProfile } from '../profiles'
+import { IPE_CATALOG, HEA_CATALOG, HEB_CATALOG, RHS_CATALOG, CHS_CATALOG } from '../profiles'
+import type { SteelProfile } from '../profiles'
 
 type Props = {
     onSelect: (profile: SteelProfile) => void
@@ -39,54 +40,10 @@ export function Catalog({ onSelect }: Props) {
                         onClick={() => onSelect(p)}
                     >
                         <div className="catalog-name">{p.name}</div>
-                        <div className="catalog-meta">h:{p.h} b:{p.b}</div>
+                        <div className="catalog-meta">{p.h} × {p.b}</div>
                     </div>
                 ))}
             </div>
-            <style>{`
-        .catalog {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            height: 100%;
-        }
-        .catalog-tabs {
-            display: flex;
-            gap: 5px;
-        }
-        .catalog-tabs button {
-            flex: 1;
-            padding: 5px;
-            cursor: pointer;
-            background: #eee;
-            border: none;
-            border-radius: 4px;
-        }
-        .catalog-tabs button.active {
-            background: #333;
-            color: #fff;
-        }
-        .catalog-list {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            border-radius: 4px;
-        }
-        .catalog-item {
-            padding: 8px;
-            border-bottom: 1px solid #f5f5f5;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-        }
-        .catalog-item:hover {
-            background: #f9f9f9;
-        }
-        .catalog-meta {
-            color: #888;
-            font-size: 0.8em;
-        }
-      `}</style>
         </div>
     )
 }

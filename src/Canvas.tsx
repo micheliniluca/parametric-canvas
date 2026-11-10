@@ -1,1896 +1,774 @@
-import { CanvasObject, PolylineObject, Point } from './types'
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react'
-import { ALL_PROFILES } from './profiles'
-import { generateBeamPath, getBeamPoints } from './beamPath'
-import { getBoltPositions, getBoltHeadPath, getBoltSideShapes } from './utils/boltUtils'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react'
+import type { CanvasObject, Point } from './types'
+import type { ToolId } from './tools'
+import { TOOLS, isCreationTool } from './tools'
+import type { DrawStyle } from './style'
+import { dashArray } from './style'
 import { round1 } from './utils/mathUtils'
+import {
+  applyOrtho, dist, getObjectBounds, getObjectCenter, getSnapPoint,
+  rotatePoint, scaleObject, translateObject,
+} from './canvas/geometry'
+import { ObjectView } from './canvas/ObjectView'
+import { SelectionOverlay } from './canvas/SelectionOverlay'
+import type { Corner, Grip } from './canvas/SelectionOverlay'
+import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
+import { TextEditor } from './canvas/TextEditor'
+import type { WandState } from './canvas/Overlays'
 
-const GRID_EXTENT = 5000
-const DRAG_THRESHOLD = 6
-const SNAP_THRESHOLD = 20
+/** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
+const SNAP_PX = 12
+const DRAG_THRESHOLD_PX = 3
+const ACCENT = '#6366f1'
 
 type Props = {
   objects: CanvasObject[]
   setObjects: Dispatch<SetStateAction<CanvasObject[]>>
   selectedId: string | null
   setSelectedId: (id: string | null) => void
-
-  // polyline in costruzione
-  drawingPolyline: Point[] | null
-  setDrawingPolyline: Dispatch<SetStateAction<Point[] | null>>
-
   view: Point
   setView: Dispatch<SetStateAction<Point>>
-
-  gridSize: number
-  snapEnabled: boolean
-  orthoEnabled: boolean
   zoom: number
   setZoom: Dispatch<SetStateAction<number>>
-  screenshotMode: 'grid' | 'white' | 'transparent'
-  setScreenshotMode: Dispatch<SetStateAction<'grid' | 'white' | 'transparent'>>
-  onScreenshot: () => void
-  isArrowMode: boolean
-  setIsArrowMode: (v: boolean) => void
-  isBoltMode: boolean
-  setIsBoltMode: (v: boolean) => void
-  isLineMode: boolean
-  setIsLineMode: (v: boolean) => void
-  isFreehandMode: boolean
-  setIsFreehandMode: (v: boolean) => void
-  isQuoteMode: boolean
-  setIsQuoteMode: (v: boolean) => void
-  isMeasureMode: boolean
-  setIsMeasureMode: (v: boolean) => void
+  gridSize: number
+  showGrid: boolean
+  snapEnabled: boolean
+  orthoEnabled: boolean
+  tool: ToolId
+  setTool: (t: ToolId) => void
+  drawStyle: DrawStyle
+  onCursorMove?: (p: Point) => void
+  notify?: (msg: string) => void
 }
 
-type ArrowGrip = { id: string; point: 'p1' | 'p2' }
+/** Interazione col puntatore in corso (una sola alla volta) */
+type Interaction =
+  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
+  | { kind: 'move'; id: string; sx: number; sy: number; startWorld: Point; start: CanvasObject; moved: boolean }
+  | { kind: 'resize'; id: string; corner: Corner; start: CanvasObject }
+  | { kind: 'vertex'; id: string; index: number }
+  | { kind: 'end'; id: string; end: 'p1' | 'p2' }
+  | { kind: 'rotate'; id: string; cx: number; cy: number; startAngle: number; initial: number }
+  | { kind: 'freehand' }
+  | { kind: 'segment' } // linea / freccia / bulloni: trascina dal primo al secondo punto
+
+/** Disegno in costruzione a due punti */
+type Segment = { p1: Point; p2: Point }
 
 export function Canvas({
-  objects,
-  setObjects,
-  selectedId,
-  setSelectedId,
-  drawingPolyline,
-  setDrawingPolyline,
-  view,
-  setView,
-  gridSize,
-  snapEnabled,
-  orthoEnabled,
-  zoom,
-  setZoom,
-  screenshotMode,
-  setScreenshotMode,
-  onScreenshot,
-  isArrowMode,
-  setIsArrowMode,
-  isBoltMode,
-  setIsBoltMode,
-  isLineMode,
-  setIsLineMode,
-  isFreehandMode,
-  setIsFreehandMode,
-  isQuoteMode,
-  setIsQuoteMode,
-  isMeasureMode,
-  setIsMeasureMode,
+  objects, setObjects, selectedId, setSelectedId,
+  view, setView, zoom, setZoom,
+  gridSize, showGrid, snapEnabled, orthoEnabled,
+  tool, setTool, drawStyle, onCursorMove, notify,
 }: Props) {
-
-
-  /* ======================
-   CAMERA (PAN)
-   ====================== */
-  // const [view, setView] = useState({ x: 0, y: 0 }) <-- REMOVED (lifted)
-  const panRef = useRef<{
-    startX: number
-    startY: number
-    viewX: number
-    viewY: number
-  } | null>(null)
-
   const svgRef = useRef<SVGSVGElement>(null)
+  const action = useRef<Interaction | null>(null)
+  const [size, setSize] = useState({ w: 1200, h: 800 })
 
-  /* ======================
-   DRAG OGGETTI
-   ====================== */
-  const dragRef = useRef<{
-    id: string
-    startX: number
-    startY: number
-    offsetX: number
-    offsetY: number
-    initialX: number
-    initialY: number
-    initialPoints?: Point[]
-    initialX1?: number
-    initialY1?: number
-    initialX2?: number
-    initialY2?: number
-    initialP1?: Point
-    initialP2?: Point
-  } | null>(null)
+  // Bozze degli strumenti
+  const [segment, setSegment] = useState<Segment | null>(null)
+  const [polyPoints, setPolyPoints] = useState<Point[] | null>(null)
+  const [freehand, setFreehand] = useState<Point[] | null>(null)
+  const [cropPoints, setCropPoints] = useState<Point[] | null>(null)
+  const [hover, setHover] = useState<Point | null>(null)
+  const [measure, setMeasure] = useState<Segment | null>(null)
+  const [scalePending, setScalePending] = useState<Segment | null>(null)
+  const [wand, setWand] = useState<WandState | null>(null)
+  /** Testo in modifica direttamente sulla tela */
+  const [editingId, setEditingId] = useState<string | null>(null)
+  /** Oggetto da scalare con lo strumento "scala con due punti" */
+  const [scaleTargetId, setScaleTargetId] = useState<string | null>(null)
 
-  const resizeRef = useRef<{
-    id: string
-    corner: 'tl' | 'tr' | 'bl' | 'br'
-  } | null>(null)
+  const selected = objects.find(o => o.id === selectedId) ?? null
 
-  const polylineGripRef = useRef<{
-    id: string
-    index: number
-  } | null>(null)
-
-  const symbolGripRef = useRef<{
-    id: string
-    index: number
-  } | null>(null)
-
-  const arrowGripRef = useRef<ArrowGrip | null>(null)
-  const boltGripRef = useRef<{ id: string; point: 'p1' | 'p2' } | null>(null)
-
-  const rotationRef = useRef<{
-    id: string
-    cx: number
-    cy: number
-    startAngle: number
-    initialRotation: number
-  } | null>(null)
-
-  const [drawingArrow, setDrawingArrow] = useState<{
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-  } | null>(null)
-
-  const [drawingQuote, setDrawingQuote] = useState<{
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-  } | null>(null)
-
-  const [drawingBolt, setDrawingBolt] = useState<{
-    p1: Point
-    p2: Point
-  } | null>(null)
-
-  const [drawingLine, setDrawingLine] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
-  const [drawingFreehand, setDrawingFreehand] = useState<Point[] | null>(null)
-  
-  const [measureStart, setMeasureStart] = useState<Point | null>(null)
-  const [drawingMeasure, setDrawingMeasure] = useState<Point | null>(null)
-  const [measureResult, setMeasureResult] = useState<{ p1: Point, p2: Point, distance: number } | null>(null)
-
+  // Cambiando strumento si azzerano le bozze
   useEffect(() => {
-    if (!isArrowMode) setDrawingArrow(null)
-    if (!isBoltMode) setDrawingBolt(null)
-    if (!isLineMode) setDrawingLine(null)
-    if (!isFreehandMode) setDrawingFreehand(null)
-    if (!isQuoteMode) setDrawingQuote(null)
-    if (!isMeasureMode) {
-      setMeasureStart(null)
-      setDrawingMeasure(null)
-      setMeasureResult(null)
-    }
-  }, [isArrowMode, isBoltMode, isLineMode, isFreehandMode, isQuoteMode, isMeasureMode])
+    setSegment(null)
+    setPolyPoints(null)
+    setFreehand(null)
+    setCropPoints(null)
+    setMeasure(null)
+    setScalePending(null)
+    setScaleTargetId(null)
+    if (tool !== 'wand') setWand(null)
+  }, [tool])
 
+  // se il testo in modifica viene eliminato (es. annulla) chiude l'editor
+  useEffect(() => {
+    if (editingId && !objects.some(o => o.id === editingId)) setEditingId(null)
+  }, [objects, editingId])
 
-  const quoteGripRef = useRef<{ id: string; point: 'p1' | 'p2' } | null>(null)
-
-  const snap = (v: number, step: number) =>
-    Math.round(v / step) * step
-
-  const rotatePoint = (p: Point, center: Point, angleDegrees: number): Point => {
-    if (!angleDegrees || angleDegrees === 0) return p
-    const rad = (angleDegrees * Math.PI) / 180
-    const dx = p.x - center.x
-    const dy = p.y - center.y
-    return {
-      x: center.x + dx * Math.cos(rad) - dy * Math.sin(rad),
-      y: center.y + dx * Math.sin(rad) + dy * Math.cos(rad)
-    }
-  }
-
-  const getObjectCenter = (o: CanvasObject): Point => {
-    if (o.type === 'rect' || o.type === 'image') return { x: o.x + o.width / 2, y: o.y + o.height / 2 }
-    if (o.type === 'circle') return { x: o.x, y: o.y }
-    if (o.type === 'text') {
-      const fontSize = o.fontSize || 20
-      const padding = o.boxPadding || 10
-      const w = o.width || (o.text.length * (fontSize * 0.6) + padding * 2)
-      const h = o.height || (fontSize + padding * 2)
-      return { x: o.x + w / 2, y: o.y + h / 2 }
-    }
-    if (o.type === 'profile') {
-      if (o.viewType === 'front') return { x: o.x, y: o.y }
-      return { x: o.x + (o.length / 2) * o.scale, y: o.y }
-    }
-    if (o.type === 'arrow' || o.type === 'quote') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
-    if (o.type === 'bolt') return { x: (o.p1.x + o.p2.x) / 2, y: (o.p1.y + o.p2.y) / 2 }
-    if (o.type === 'symbol') return { x: o.x, y: o.y }
-    if (o.type === 'polyline') {
-      const pl = o as PolylineObject
-      if (pl.points.length === 0) return { x: 0, y: 0 }
-      const minX = Math.min(...pl.points.map((p: Point) => p.x))
-      const maxX = Math.max(...pl.points.map((p: Point) => p.x))
-      const minY = Math.min(...pl.points.map((p: Point) => p.y))
-      const maxY = Math.max(...pl.points.map((p: Point) => p.y))
-      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
-    }
-    return { x: (o as any).x || 0, y: (o as any).y || 0 }
-  }
-
-  const getSnapPoint = (worldX: number, worldY: number, excludeId?: string): Point => {
-    // 1. COLLECT CANDIDATES FROM OTHER OBJECTS
-    const candidates: Point[] = []
-    
-    let nearestEdgePoint: Point | null = null
-    let minEdgeDist = SNAP_THRESHOLD
-
-    const checkEdge = (p1: Point, p2: Point) => {
-      const l2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
-      if (l2 === 0) return;
-      let t = ((worldX - p1.x) * (p2.x - p1.x) + (worldY - p1.y) * (p2.y - p1.y)) / l2;
-      t = Math.max(0, Math.min(1, t));
-      const projX = p1.x + t * (p2.x - p1.x);
-      const projY = p1.y + t * (p2.y - p1.y);
-      const dist = Math.sqrt((projX - worldX)**2 + (projY - worldY)**2);
-      if (dist < minEdgeDist) {
-        minEdgeDist = dist;
-        nearestEdgePoint = { x: projX, y: projY };
-      }
-    }
-
-    objects.forEach((o: CanvasObject) => {
-      if (o.id === excludeId) return
-
-      const center = getObjectCenter(o)
-      const rotation = (o as any).rotation || 0
-
-      const rotate = (p: Point): Point => rotatePoint(p, center, rotation)
-
-      if (o.type === 'rect' || o.type === 'image') {
-        const p1 = rotate({ x: o.x, y: o.y })
-        const p2 = rotate({ x: o.x + o.width, y: o.y })
-        const p3 = rotate({ x: o.x + o.width, y: o.y + o.height })
-        const p4 = rotate({ x: o.x, y: o.y + o.height })
-        candidates.push(p1, p2, p3, p4) // vertices
-        candidates.push(
-          { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 },
-          { x: (p2.x + p3.x)/2, y: (p2.y + p3.y)/2 },
-          { x: (p3.x + p4.x)/2, y: (p3.y + p4.y)/2 },
-          { x: (p4.x + p1.x)/2, y: (p4.y + p1.y)/2 }
-        ) // midpoints
-        checkEdge(p1, p2)
-        checkEdge(p2, p3)
-        checkEdge(p3, p4)
-        checkEdge(p4, p1)
-      } else if (o.type === 'circle') {
-        candidates.push({ x: o.x, y: o.y })
-      } else if (o.type === 'profile') {
-        const profile = ALL_PROFILES.find(p => p.name === o.profileName)
-        if (profile) {
-          const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
-          const rotatedPts = pts.map(p => rotate({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale }))
-          rotatedPts.forEach((p: Point) => candidates.push(p))
-          for (let i = 0; i < rotatedPts.length; i++) {
-            const next = rotatedPts[(i + 1) % rotatedPts.length]
-            candidates.push({ x: (rotatedPts[i].x + next.x)/2, y: (rotatedPts[i].y + next.y)/2 }) // midpoints
-            checkEdge(rotatedPts[i], next)
-          }
-        }
-      } else if (o.type === 'polyline') {
-        const rotatedPts = o.points.map((p: Point) => rotate(p))
-        rotatedPts.forEach((p: Point) => candidates.push(p))
-        for (let i = 0; i < rotatedPts.length - 1; i++) {
-          candidates.push({ x: (rotatedPts[i].x + rotatedPts[i+1].x)/2, y: (rotatedPts[i].y + rotatedPts[i+1].y)/2 })
-          checkEdge(rotatedPts[i], rotatedPts[i+1])
-        }
-        if (o.closed && rotatedPts.length > 2) {
-            candidates.push({ x: (rotatedPts[rotatedPts.length-1].x + rotatedPts[0].x)/2, y: (rotatedPts[rotatedPts.length-1].y + rotatedPts[0].y)/2 })
-            checkEdge(rotatedPts[rotatedPts.length-1], rotatedPts[0])
-        }
-      } else if (o.type === 'bolt') {
-        const boltPositions = getBoltPositions(o)
-        boltPositions.forEach(bp => candidates.push(rotate(bp)))
-      } else if (o.type === 'arrow' || o.type === 'quote') {
-        const p1 = rotate({ x: o.x1, y: o.y1 })
-        const p2 = rotate({ x: o.x2, y: o.y2 })
-        candidates.push(p1, p2)
-        candidates.push({ x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 })
-        checkEdge(p1, p2)
-      } else if (o.type === 'symbol') {
-        candidates.push({ x: o.x, y: o.y })
-      }
-    })
-
-    // 2. CHECK VERTEX/MIDPOINT SNAPPING
-    for (const c of candidates) {
-      const dist = Math.sqrt((c.x - worldX) ** 2 + (c.y - worldY) ** 2)
-      if (dist < SNAP_THRESHOLD) return c
-    }
-
-    // 3. CHECK EDGE SNAPPING
-    if (nearestEdgePoint) {
-      return nearestEdgePoint
-    }
-
-    // 4. FALLBACK TO GRID SNAPPING
-    const gx = snap(worldX, gridSize)
-    const gy = snap(worldY, gridSize)
-    const gDist = Math.sqrt((gx - worldX) ** 2 + (gy - worldY) ** 2)
-    if (gDist < SNAP_THRESHOLD) return { x: gx, y: gy }
-
-    return { x: worldX, y: worldY }
-  }
-
-  const getSvgPoint = (
-    e: React.MouseEvent | React.WheelEvent
-  ) => {
+  useLayoutEffect(() => {
     const svg = svgRef.current
-    if (!svg) return { x: 0, y: 0 }
+    if (!svg) return
+    const ro = new ResizeObserver(([entry]) => setSize({ w: entry.contentRect.width, h: entry.contentRect.height }))
+    ro.observe(svg)
+    return () => ro.disconnect()
+  }, [])
 
-    const pt = svg.createSVGPoint()
-    pt.x = e.clientX
-    pt.y = e.clientY
+  /* ---------- coordinate ---------- */
 
-    // transform to SVG coordinate system
-    const screenCTM = svg.getScreenCTM()
-    if (!screenCTM) return { x: 0, y: 0 }
-
-    const p = pt.matrixTransform(screenCTM.inverse())
-    return { x: p.x, y: p.y }
+  const toWorld = (e: { clientX: number; clientY: number }): Point => {
+    const rect = svgRef.current!.getBoundingClientRect()
+    return { x: (e.clientX - rect.left) / zoom + view.x, y: (e.clientY - rect.top) / zoom + view.y }
   }
+
+  const snapOn = (e: ReactMouseEvent) => snapEnabled || e.ctrlKey || e.metaKey
+  const orthoOn = (e: ReactMouseEvent) => orthoEnabled || e.shiftKey
+
+  /** Punto mondo con snap e (opzionale) vincolo ortogonale rispetto a `ref` */
+  const pick = (e: ReactMouseEvent, ref?: Point | null, excludeId?: string): Point => {
+    const w = toWorld(e)
+    let p = snapOn(e) ? getSnapPoint(objects, w, gridSize, SNAP_PX / zoom, excludeId) : w
+    if (ref && orthoOn(e)) p = applyOrtho(p, ref)
+    return p
+  }
+
+  const updateObject = (id: string, fn: (o: CanvasObject) => CanvasObject) =>
+    setObjects(objs => objs.map(o => (o.id === id ? fn(o) : o)))
+
+  const addObject = (o: CanvasObject) => {
+    setObjects(prev => [...prev, o])
+    if (!TOOLS[tool].sticky) {
+      setTool('select')
+      setSelectedId(o.id)
+    }
+  }
+
+  const strokeProps = () => ({
+    stroke: drawStyle.stroke,
+    strokeWidth: drawStyle.strokeWidth,
+    strokeDash: drawStyle.strokeDash,
+  })
+
+  /* ---------- zoom ---------- */
 
   const onWheel = (e: React.WheelEvent) => {
-    // Zoom centered on cursor
-    const zoomSpeed = 0.001
-    const delta = -e.deltaY
-    const newZoom = Math.min(Math.max(zoom + delta * zoomSpeed, 0.1), 10)
-
-    const rect = e.currentTarget.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-
-    // Screen to world (current): W = (S / zoom) + view
-    // We want world to stay same: (S / zoom) + view = (S / newZoom) + newView
-    const dx = (mouseX / zoom) - (mouseX / newZoom)
-    const dy = (mouseY / zoom) - (mouseY / newZoom)
-
+    const rect = svgRef.current!.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const factor = Math.exp(-e.deltaY * 0.0015)
+    const newZoom = Math.min(Math.max(zoom * factor, 0.05), 20)
     setZoom(newZoom)
-    setView(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+    setView(v => ({ x: v.x + mx / zoom - mx / newZoom, y: v.y + my / zoom - my / newZoom }))
   }
-  /* ======================
-     MOUSE DOWN SU OGGETTO
-     ====================== */
-  const onObjectMouseDown = (e: React.MouseEvent, o: CanvasObject) => {
+
+  /* ---------- pressione sugli oggetti ---------- */
+
+  const onObjectMouseDown = (e: ReactMouseEvent, o: CanvasObject) => {
+    if (e.button !== 0) return
     e.stopPropagation()
+    if (editingId && o.id !== editingId) finishEditing()
+
+    if (tool === 'wand') {
+      if (o.type === 'image') startWand(e, o)
+      return
+    }
+
     setSelectedId(o.id)
-
-    const p = getSvgPoint(e as React.MouseEvent<SVGSVGElement, MouseEvent>)
-    const worldX = (p.x / zoom) + view.x
-    const worldY = (p.y / zoom) + view.y
-
-    const refPoint = o.type === 'polyline' ? o.points[0] : ((o.type === 'arrow' || o.type === 'quote') ? { x: o.x1, y: o.y1 } : (o.type === 'bolt' ? o.p1 : o))
-
-    dragRef.current = {
-      id: o.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      offsetX: worldX - refPoint.x,
-      offsetY: worldY - refPoint.y,
-      initialX: refPoint.x,
-      initialY: refPoint.y,
-      initialPoints: o.type === 'polyline' ? o.points : undefined,
-      initialX1: (o.type === 'arrow' || o.type === 'quote') ? o.x1 : undefined,
-      initialY1: (o.type === 'arrow' || o.type === 'quote') ? o.y1 : undefined,
-      initialX2: (o.type === 'arrow' || o.type === 'quote') ? o.x2 : undefined,
-      initialY2: (o.type === 'arrow' || o.type === 'quote') ? o.y2 : undefined,
-      initialP1: o.type === 'bolt' ? o.p1 : undefined,
-      initialP2: o.type === 'bolt' ? o.p2 : undefined,
+    if (o.locked) {
+      // oggetto bloccato: si seleziona ma trascinandolo si sposta la vista
+      action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
+      return
+    }
+    action.current = {
+      kind: 'move', id: o.id, sx: e.clientX, sy: e.clientY,
+      startWorld: toWorld(e), start: o, moved: false,
     }
   }
 
-
-  /* ======================
-     DRAG OGGETTI
-     ====================== */
-
-
-  const onMouseMove = (
-    e: React.MouseEvent<SVGSVGElement, MouseEvent>
-  ) => {
-    if (drawingArrow) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-      if (orthoEnabled || e.shiftKey) {
-        const dx = snapped.x - drawingArrow.x1
-        const dy = snapped.y - drawingArrow.y1
-        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingArrow.y1
-        else snapped.x = drawingArrow.x1
-      }
-      setDrawingArrow(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
-      return
-    }
-
-    if (drawingQuote) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-      if (orthoEnabled || e.shiftKey) {
-        const dx = snapped.x - drawingQuote.x1
-        const dy = snapped.y - drawingQuote.y1
-        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingQuote.y1
-        else snapped.x = drawingQuote.x1
-      }
-      setDrawingQuote(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
-      return
-    }
-
-    if (isMeasureMode && measureStart && !measureResult) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-      if (orthoEnabled || e.shiftKey) {
-        const dx = snapped.x - measureStart.x
-        const dy = snapped.y - measureStart.y
-        if (Math.abs(dx) > Math.abs(dy)) snapped.y = measureStart.y
-        else snapped.x = measureStart.x
-      }
-      setDrawingMeasure(snapped)
-      return
-    }
-
-    if (drawingBolt) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-      if (orthoEnabled || e.shiftKey) {
-        const dx = snapped.x - drawingBolt.p1.x
-        const dy = snapped.y - drawingBolt.p1.y
-        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingBolt.p1.y
-        else snapped.x = drawingBolt.p1.x
-      }
-      setDrawingBolt(prev => prev ? { ...prev, p2: snapped } : null)
-      return
-    }
-
-    if (drawingLine) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-      if (orthoEnabled || e.shiftKey) {
-        const dx = snapped.x - drawingLine.x1
-        const dy = snapped.y - drawingLine.y1
-        if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingLine.y1
-        else snapped.x = drawingLine.x1
-      }
-      setDrawingLine(prev => prev ? { ...prev, x2: snapped.x, y2: snapped.y } : null)
-      return
-    }
-
-    if (drawingFreehand) {
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      setDrawingFreehand(prev => {
-        if (!prev) return null
-        const last = prev[prev.length - 1]
-        const dist = Math.sqrt((wx - last.x) ** 2 + (wy - last.y) ** 2)
-        if (dist > 2) {
-          return [...prev, { x: wx, y: wy }]
-        }
-        return prev
+  const startWand = (e: ReactMouseEvent, o: Extract<CanvasObject, { type: 'image' }>) => {
+    const local = rotatePoint(toWorld(e), getObjectCenter(o), -(o.rotation || 0))
+    const lx = local.x - o.x
+    const ly = local.y - o.y
+    if (lx < 0 || ly < 0 || lx > o.width || ly > o.height) return
+    setSelectedId(o.id)
+    const img = new Image()
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = img.width
+      c.height = img.height
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(img, 0, 0)
+      const px = Math.floor((lx * img.width) / o.width)
+      const py = Math.floor((ly * img.height) / o.height)
+      const [r, g, b] = ctx.getImageData(px, py, 1, 1).data
+      setWand({
+        id: o.id, originalSrc: o.src, targetColor: { r, g, b }, targetPixel: { x: px, y: py },
+        threshold: wand?.threshold ?? 30, contiguous: wand?.contiguous ?? true, previewSrc: null,
       })
-      return
     }
+    img.src = o.src
+  }
 
-    if (boltGripRef.current) {
-      const g = boltGripRef.current
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
-
-      setObjects(objs => objs.map(o => {
-        if (o.id !== g.id || o.type !== 'bolt') return o
-        let finalX = snapped.x
-        let finalY = snapped.y
-        if (orthoEnabled || e.shiftKey) {
-          const refPoint = g.point === 'p1' ? o.p2 : o.p1
-          const dx = finalX - refPoint.x
-          const dy = finalY - refPoint.y
-          if (Math.abs(dx) > Math.abs(dy)) finalY = refPoint.y
-          else finalX = refPoint.x
-        }
-        
-        if (g.point === 'p1') return { ...o, p1: { x: finalX, y: finalY }, x: finalX, y: finalY }
-        return { ...o, p2: { x: finalX, y: finalY } }
-      }))
-      return
+  /** Chiude l'editor del testo; un testo lasciato vuoto viene eliminato */
+  const finishEditing = () => {
+    if (!editingId) return
+    const t = objects.find(o => o.id === editingId)
+    setEditingId(null)
+    if (t?.type === 'text' && !t.text.trim()) {
+      setObjects(objs => objs.filter(o => o.id !== t.id))
+      setSelectedId(null)
     }
+  }
 
-    if (rotationRef.current) {
-      const { id, cx, cy, startAngle, initialRotation } = rotationRef.current
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
+  const onObjectDoubleClick = (o: CanvasObject) => {
+    if (tool === 'select' && o.type === 'text' && !o.locked) setEditingId(o.id)
+  }
 
-      const currentAngle = Math.atan2(wy - cy, wx - cx) * 180 / Math.PI
-      let delta = currentAngle - startAngle
-
-      // Snap to 15 degrees if shift is pressed
-      let newRotation = initialRotation + delta
-      if (e.shiftKey) {
-        newRotation = Math.round(newRotation / 15) * 15
+  const onGrip = (e: ReactMouseEvent, g: Grip) => {
+    if (!selected || selected.locked) return
+    const id = selected.id
+    if (g.kind === 'resize') action.current = { kind: 'resize', id, corner: g.corner, start: selected }
+    else if (g.kind === 'vertex') action.current = { kind: 'vertex', id, index: g.index }
+    else if (g.kind === 'end') action.current = { kind: 'end', id, end: g.end }
+    else {
+      const c = getObjectCenter(selected)
+      const w = toWorld(e)
+      action.current = {
+        kind: 'rotate', id, cx: c.x, cy: c.y,
+        startAngle: (Math.atan2(w.y - c.y, w.x - c.x) * 180) / Math.PI,
+        initial: selected.rotation || 0,
       }
+    }
+  }
 
-      setObjects(objs => objs.map(o => {
-        if (o.id !== id) return o
-        return { ...o, rotation: newRotation }
-      }))
+  /* ---------- pressione sullo sfondo / strumenti ---------- */
+
+  const onMouseDown = (e: ReactMouseEvent<SVGSVGElement>) => {
+    if (editingId) finishEditing()
+    // Tasto centrale: pan con qualsiasi strumento
+    if (e.button === 1) {
+      e.preventDefault()
+      action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
       return
     }
+    if (e.button !== 0) return
 
-    if (arrowGripRef.current) {
-      const g = arrowGripRef.current
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
-
-      setObjects(objs => objs.map(o => {
-        if (o.id !== g.id || o.type !== 'arrow') return o
-        let finalX = snapped.x
-        let finalY = snapped.y
-        if (orthoEnabled || e.shiftKey) {
-          const startX = g.point === 'p1' ? o.x2 : o.x1
-          const startY = g.point === 'p1' ? o.y2 : o.y1
-          const dx = finalX - startX
-          const dy = finalY - startY
-          if (Math.abs(dx) > Math.abs(dy)) finalY = startY
-          else finalX = startX
+    switch (tool) {
+      case 'text': {
+        const p = pick(e)
+        const id = crypto.randomUUID()
+        setObjects(prev => [...prev, {
+          id, type: 'text', x: p.x, y: p.y - 14, text: '', fontSize: 16, boxEnabled: false, boxPadding: 6,
+          stroke: drawStyle.stroke, textColor: drawStyle.stroke, strokeWidth: 1, fillEnabled: false, fillColor: '#ffffff',
+        }])
+        setTool('select')
+        setSelectedId(id)
+        setEditingId(id)
+        return
+      }
+      case 'line':
+      case 'arrow':
+      case 'bolt':
+      case 'rect':
+      case 'circle': {
+        const p = pick(e)
+        setSegment({ p1: p, p2: p })
+        action.current = { kind: 'segment' }
+        return
+      }
+      case 'freehand':
+        setFreehand([toWorld(e)])
+        action.current = { kind: 'freehand' }
+        return
+      case 'quote':
+      case 'measure':
+      case 'scale': {
+        const p = pick(e, segment?.p1)
+        if (tool === 'measure' && measure) setMeasure(null)
+        if (!segment && tool === 'scale') {
+          // bersaglio: oggetto selezionato, altrimenti l'immagine (o l'oggetto) sotto il primo clic
+          const hit = findTopObjectAt(objects, p)
+          const target = (hit?.type === 'image' ? hit : null) ?? selected ?? hit
+          if (!target) {
+            notify?.('Fai clic su un\'immagine: nessun oggetto sotto il punto')
+            return
+          }
+          setScaleTargetId(target.id)
+          setSelectedId(target.id)
         }
-        
-        if (g.point === 'p1') return { ...o, x1: finalX, y1: finalY }
-        return { ...o, x2: finalX, y2: finalY }
-      }))
-      return
-    }
-
-    if (quoteGripRef.current) {
-      const g = quoteGripRef.current
-      const p = getSvgPoint(e)
-      const wx = (p.x / zoom) + view.x
-      const wy = (p.y / zoom) + view.y
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      const snapped = shouldSnap ? getSnapPoint(wx, wy, g.id) : { x: wx, y: wy }
-
-      setObjects(objs => objs.map(o => {
-        if (o.id !== g.id || o.type !== 'quote') return o
-        let finalX = snapped.x
-        let finalY = snapped.y
-        if (orthoEnabled || e.shiftKey) {
-          const startX = g.point === 'p1' ? o.x2 : o.x1
-          const startY = g.point === 'p1' ? o.y2 : o.y1
-          const dx = finalX - startX
-          const dy = finalY - startY
-          if (Math.abs(dx) > Math.abs(dy)) finalY = startY
-          else finalX = startX
+        if (!segment) {
+          setSegment({ p1: p, p2: p })
+          return
         }
-        
-        if (g.point === 'p1') return { ...o, x1: finalX, y1: finalY }
-        return { ...o, x2: finalX, y2: finalY }
-      }))
-      return
+        finishClickSegment({ p1: segment.p1, p2: p })
+        setSegment(null)
+        return
+      }
+      case 'polyline': {
+        const last = polyPoints?.[polyPoints.length - 1]
+        const p = pick(e, last)
+        if (!polyPoints) {
+          setPolyPoints([p])
+          return
+        }
+        if (e.detail >= 2) {
+          finishPolyline(false)
+          return
+        }
+        // clic sul primo punto: chiude la forma
+        if (polyPoints.length >= 3 && dist(p, polyPoints[0]) < SNAP_PX / zoom) {
+          finishPolyline(true)
+          return
+        }
+        setPolyPoints([...polyPoints, p])
+        return
+      }
+      case 'crop': {
+        if (!selected || selected.type !== 'image') return
+        if (e.detail >= 2) {
+          applyCrop()
+          return
+        }
+        const w = rotatePoint(pick(e), getObjectCenter(selected), -(selected.rotation || 0))
+        setCropPoints(prev => [...(prev ?? []), { x: w.x - selected.x, y: w.y - selected.y }])
+        return
+      }
+      default:
+        // select / wand: clic sullo sfondo deseleziona e sposta la vista
+        setSelectedId(null)
+        action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
     }
+  }
 
-    if (panRef.current) {
-      const dx = e.clientX - panRef.current.startX
-      const dy = e.clientY - panRef.current.startY
-
-      setView({
-        x: panRef.current.viewX - dx / zoom,
-        y: panRef.current.viewY - dy / zoom,
+  const finishClickSegment = (s: Segment) => {
+    if (dist(s.p1, s.p2) < 1) return
+    if (tool === 'quote') {
+      addObject({
+        id: crypto.randomUUID(), type: 'quote', x: 0, y: 0,
+        x1: s.p1.x, y1: s.p1.y, x2: s.p2.x, y2: s.p2.y,
+        stroke: drawStyle.stroke, textColor: drawStyle.stroke, strokeWidth: 1,
       })
+    } else if (tool === 'measure') {
+      setMeasure(s)
+    } else if (tool === 'scale') {
+      setScalePending(s)
+    }
+  }
+
+  const finishPolyline = (closed: boolean) => {
+    const pts = polyPoints ?? []
+    setPolyPoints(null)
+    if (pts.length < 2) return
+    addObject({
+      id: crypto.randomUUID(), type: 'polyline',
+      points: closed ? [...pts, pts[0]] : pts, closed,
+      ...strokeProps(),
+      fillEnabled: closed && drawStyle.fillEnabled, fillColor: drawStyle.fillColor,
+    })
+  }
+
+  const applyCrop = () => {
+    if (selected?.type === 'image' && cropPoints && cropPoints.length > 2) {
+      updateObject(selected.id, o => ({ ...o, clipPoints: cropPoints }))
+    }
+    setCropPoints(null)
+    setTool('select')
+  }
+
+  // Invio termina polilinea/scontorno
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (polyPoints) finishPolyline(false)
+      else if (cropPoints) applyCrop()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  /* ---------- movimento ---------- */
+
+  const onMouseMove = (e: ReactMouseEvent<SVGSVGElement>) => {
+    const w = toWorld(e)
+    onCursorMove?.(w)
+    const a = action.current
+
+    // Anteprime degli strumenti a clic
+    if (!a) {
+      if (segment && (tool === 'quote' || tool === 'measure' || tool === 'scale')) {
+        setSegment({ ...segment, p2: pick(e, segment.p1) })
+      } else if (polyPoints) {
+        setHover(pick(e, polyPoints[polyPoints.length - 1]))
+      } else if (cropPoints) {
+        setHover(pick(e))
+      }
       return
     }
 
-    if (resizeRef.current) {
-      const { id, corner } = resizeRef.current
-      const p = getSvgPoint(e)
-      const wx_raw = (p.x / zoom) + view.x
-      const wy_raw = (p.y / zoom) + view.y
+    switch (a.kind) {
+      case 'pan':
+        setView({ x: a.vx - (e.clientX - a.sx) / zoom, y: a.vy - (e.clientY - a.sy) / zoom })
+        return
 
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      const snapped = shouldSnap ? getSnapPoint(wx_raw, wy_raw, id) : { x: wx_raw, y: wy_raw }
-      const wx = snapped.x
-      const wy = snapped.y
-
-      setObjects(objs =>
-        objs.map(o => {
-          if (o.id !== id || (o.type !== 'rect' && o.type !== 'image' && o.type !== 'text')) return o
-
-          let { x, y } = o
-          let width = (o as any).width || 100
-          let height = (o as any).height || 100
-
-          if (corner === 'tl') {
-            const newX = Math.min(wx, x + width - 5)
-            const newY = Math.min(wy, y + height - 5)
-            width += x - newX
-            height += y - newY
-            x = newX
-            y = newY
-          }
-          if (corner === 'tr') {
-            const newY = Math.min(wy, y + height - 5)
-            width = wx - x
-            height += y - newY
-            y = newY
-          }
-          if (corner === 'bl') {
-            const newX = Math.min(wx, x + width - 5)
-            width += x - newX
-            x = newX
-            height = wy - y
-          }
-          if (corner === 'br') {
-            width = wx - x
-            height = wy - y
-          }
-
-          return {
-            ...o,
-            x,
-            y,
-            width: Math.max(5, width),
-            height: Math.max(5, height),
-          } as any
-        })
-      )
-      return
-    }
-
-    if (polylineGripRef.current) {
-      const { id, index } = polylineGripRef.current
-      const p = getSvgPoint(e as any)
-
-      setObjects(objs =>
-        objs.map(o => {
-          if (o.id !== id || o.type !== 'polyline') return o
-
-          const pts = o.points
-          const lastIndex = pts.length - 1
-
-          const isClosed =
-            pts.length > 2 &&
-            pts[0].x === pts[lastIndex].x &&
-            pts[0].y === pts[lastIndex].y
-
-          const newPoints = pts.map((pt, i) => {
-            const wx = (p.x / zoom) + view.x
-            const wy = (p.y / zoom) + view.y
-            const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-            let snapped = shouldSnap ? getSnapPoint(wx, wy, id) : { x: wx, y: wy }
-            
-            if (i === index) {
-              if (orthoEnabled || (e as any).shiftKey) {
-                // Determine previous and next points, if we want strict ortho we need a reference point.
-                // Normally a polyline grip is orthogonal to the previous point, or we just pick the previous point as reference.
-                const refPt = i > 0 ? pts[i - 1] : (pts.length > 1 ? pts[i + 1] : null)
-                if (refPt) {
-                  const dx = snapped.x - refPt.x
-                  const dy = snapped.y - refPt.y
-                  if (Math.abs(dx) > Math.abs(dy)) snapped.y = refPt.y
-                  else snapped.x = refPt.x
-                }
-              }
-              return snapped
+      case 'segment':
+        setSegment(s => {
+          if (!s) return s
+          if (tool === 'rect' || tool === 'circle') {
+            let p = pick(e)
+            if (tool === 'rect' && e.shiftKey) {
+              const d = Math.max(Math.abs(p.x - s.p1.x), Math.abs(p.y - s.p1.y))
+              p = { x: s.p1.x + Math.sign(p.x - s.p1.x || 1) * d, y: s.p1.y + Math.sign(p.y - s.p1.y || 1) * d }
             }
-            if (isClosed) {
-              if (index === 0 && i === lastIndex) return snapped
-              if (index === lastIndex && i === 0) return snapped
-            }
-            return pt
-          })
-
-          return { ...o, points: newPoints }
+            return { ...s, p2: p }
+          }
+          return { ...s, p2: pick(e, s.p1) }
         })
-      )
-      return
-    }
+        return
 
-    if (symbolGripRef.current) {
-      const g = symbolGripRef.current
-      const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-      setObjects(objs =>
-        objs.map(o => {
-          if (o.id !== g.id || o.type !== 'symbol' || !o.points) return o
-          const newPoints = [...o.points]
-          const p = getSvgPoint(e)
-          const rawX = (p.x / zoom) + view.x - o.x
-          const rawY = (p.y / zoom) + view.y - o.y
-
-          let finalX = rawX
-          let finalY = rawY
-          if (shouldSnap) {
-            const snapped = getSnapPoint(rawX + o.x, rawY + o.y, o.id)
-            finalX = snapped.x - o.x
-            finalY = snapped.y - o.y
-          }
-
-          newPoints[g.index] = { x: finalX, y: finalY }
-          return { ...o, points: newPoints }
+      case 'freehand':
+        setFreehand(prev => {
+          if (!prev) return prev
+          return dist(prev[prev.length - 1], w) > 1.5 / zoom ? [...prev, w] : prev
         })
-      )
-      return
+        return
+
+      case 'move': {
+        if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < DRAG_THRESHOLD_PX) return
+        a.moved = true
+        // si aggancia il punto di presa, poi si trasla l'oggetto della stessa quantità
+        const raw = w
+        const snapped = snapOn(e) ? getSnapPoint(objects, raw, gridSize, SNAP_PX / zoom, a.id) : raw
+        let dx = snapped.x - a.startWorld.x
+        let dy = snapped.y - a.startWorld.y
+        if (orthoOn(e)) {
+          if (Math.abs(dx) > Math.abs(dy)) dy = 0
+          else dx = 0
+        }
+        updateObject(a.id, () => translateObject(a.start, dx, dy))
+        return
+      }
+
+      case 'resize': {
+        const p = pick(e, null, a.id)
+        updateObject(a.id, () => resizeObject(a.start, a.corner, p, !e.shiftKey))
+        return
+      }
+
+      case 'vertex':
+        updateObject(a.id, o => {
+          if (o.type !== 'polyline') return o
+          const ref = a.index > 0 ? o.points[a.index - 1] : o.points[1]
+          const p = pick(e, ref, a.id)
+          const last = o.points.length - 1
+          const points = o.points.map((pt, i) =>
+            i === a.index || (o.closed && ((a.index === 0 && i === last) || (a.index === last && i === 0))) ? p : pt,
+          )
+          return { ...o, points }
+        })
+        return
+
+      case 'end':
+        updateObject(a.id, o => {
+          if (o.type === 'arrow' || o.type === 'quote') {
+            const other = a.end === 'p1' ? { x: o.x2, y: o.y2 } : { x: o.x1, y: o.y1 }
+            const p = pick(e, other, a.id)
+            return a.end === 'p1' ? { ...o, x1: p.x, y1: p.y } : { ...o, x2: p.x, y2: p.y }
+          }
+          if (o.type === 'bolt') {
+            const p = pick(e, a.end === 'p1' ? o.p2 : o.p1, a.id)
+            return a.end === 'p1' ? { ...o, p1: p, x: p.x, y: p.y } : { ...o, p2: p }
+          }
+          return o
+        })
+        return
+
+      case 'rotate': {
+        const angle = (Math.atan2(w.y - a.cy, w.x - a.cx) * 180) / Math.PI
+        let rot = a.initial + angle - a.startAngle
+        if (e.shiftKey) rot = Math.round(rot / 15) * 15
+        rot = ((rot % 360) + 540) % 360 - 180
+        updateObject(a.id, o => ({ ...o, rotation: rot }))
+        return
+      }
     }
-
-    if (!dragRef.current) return
-    const d = dragRef.current
-
-    const dx_screen = e.clientX - d.startX
-    const dy_screen = e.clientY - d.startY
-    // Delta in world coordinates
-    const dx_world = dx_screen / zoom
-    const dy_world = dy_screen / zoom
-
-    // Decide if we snap
-    const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-
-    setObjects(prevObjects =>
-      prevObjects.map(o => {
-        // Only update the object being dragged
-        if (o.id !== d.id) return o
-
-        // Calculate the raw new position relative to initial position
-        // This avoids accumulation errors
-        const rawNewX = d.initialX + dx_world
-        const rawNewY = d.initialY + dy_world
-
-        // Calculate where the "mouse grab point" would be now in world space
-        // We use this for snapping logic usually, but here we can snap the object origin directly
-        // or snap the mouse point.
-        // Let's stick to snapping the object origin for clarity if it's a simple move.
-        // Or better: snap the point we grabbed, to align with grid?
-        // Prior logic snapped the mouse cursor position. Let's keep that consistency.
-
-        const rawMouseX = d.initialX + d.offsetX + dx_world
-        const rawMouseY = d.initialY + d.offsetY + dy_world
-
-        let snappedX = rawNewX
-        let snappedY = rawNewY
-
-        if (shouldSnap) {
-          const snappedMouse = getSnapPoint(rawMouseX, rawMouseY, o.id)
-          const snapDiffX = snappedMouse.x - rawMouseX
-          const snapDiffY = snappedMouse.y - rawMouseY
-          snappedX = rawNewX + snapDiffX
-          snappedY = rawNewY + snapDiffY
-        }
-        
-        if (orthoEnabled || e.shiftKey) {
-          const dx = snappedX - d.initialX
-          const dy = snappedY - d.initialY
-          if (Math.abs(dx) > Math.abs(dy)) snappedY = d.initialY
-          else snappedX = d.initialX
-        }
-
-        // Apply changes based on object type
-        if (o.type === 'polyline') {
-          const finalDX = snappedX - d.initialX
-          const finalDY = snappedY - d.initialY
-          if (!d.initialPoints) return o // Safety check
-          return {
-            ...o,
-            points: d.initialPoints.map(p => ({
-              x: p.x + finalDX,
-              y: p.y + finalDY
-            }))
-          }
-        }
-
-        if (o.type === 'arrow' || o.type === 'quote') {
-          const finalDX = snappedX - d.initialX
-          const finalDY = snappedY - d.initialY
-          if (d.initialX1 === undefined || d.initialY1 === undefined || d.initialX2 === undefined || d.initialY2 === undefined) return o
-          return {
-            ...o,
-            x1: d.initialX1 + finalDX,
-            y1: d.initialY1 + finalDY,
-            x2: d.initialX2 + finalDX,
-            y2: d.initialY2 + finalDY
-          }
-        }
-
-        if (o.type === 'bolt') {
-          const finalDX = snappedX - d.initialX
-          const finalDY = snappedY - d.initialY
-          if (!d.initialP1 || !d.initialP2) return o
-          return {
-            ...o,
-            p1: { x: d.initialP1.x + finalDX, y: d.initialP1.y + finalDY },
-            p2: { x: d.initialP2.x + finalDX, y: d.initialP2.y + finalDY },
-          }
-        }
-
-        // For all other types with x,y properties (Rect, Circle, Text, Image, Profile, Symbol)
-        return {
-          ...o,
-          x: snappedX,
-          y: snappedY
-        }
-      })
-    )
   }
 
   const onMouseUp = () => {
-    if (drawingArrow) {
-      if (Math.abs(drawingArrow.x1 - drawingArrow.x2) > 5 || Math.abs(drawingArrow.y1 - drawingArrow.y2) > 5) {
-        const newId = crypto.randomUUID()
-        setObjects(prev => [...prev, {
-          id: newId,
-          type: 'arrow',
-          x1: drawingArrow.x1,
-          y1: drawingArrow.y1,
-          x2: drawingArrow.x2,
-          y2: drawingArrow.y2,
-          stroke: '#000000',
-          strokeWidth: 2,
-          x: 0, y: 0 // base props
-        }])
-        setSelectedId(null)
+    const a = action.current
+    action.current = null
+    if (!a) return
+
+    if (a.kind === 'segment' && segment) {
+      const { p1, p2 } = segment
+      setSegment(null)
+      const fill = { fillEnabled: drawStyle.fillEnabled, fillColor: drawStyle.fillColor }
+      const clickOnly = dist(p1, p2) < 3 / zoom
+      if (tool === 'rect') {
+        const r = clickOnly
+          ? { x: p1.x - 60, y: p1.y - 40, width: 120, height: 80 }
+          : { x: Math.min(p1.x, p2.x), y: Math.min(p1.y, p2.y), width: Math.abs(p2.x - p1.x), height: Math.abs(p2.y - p1.y) }
+        addObject({ id: crypto.randomUUID(), type: 'rect', ...r, ...strokeProps(), ...fill })
+        return
       }
-      setDrawingArrow(null)
-      setIsArrowMode(false)
-    }
-
-    if (drawingBolt) {
-      console.log('Adding bolt object:', {
-        type: 'bolt',
-        p1: drawingBolt.p1,
-        p2: drawingBolt.p2
-      })
-      const newId = crypto.randomUUID()
-      setObjects(prev => [
-        ...prev,
-        {
-          id: newId,
-          type: 'bolt',
-          x: drawingBolt.p1.x,
-          y: drawingBolt.p1.y,
-          p1: drawingBolt.p1,
-          p2: drawingBolt.p2,
-          diameter: 16,
-          spacingX: '100',
-          spacingY: '50',
-          offsetX: 0,
-          offsetY: 0,
-          viewType: 'top',
-          length: 60,
-        }
-      ])
-      setDrawingBolt(null)
-      setIsBoltMode(false)
-      setSelectedId(null)
-    }
-
-    if (drawingLine) {
-      if (Math.abs(drawingLine.x1 - drawingLine.x2) > 2 || Math.abs(drawingLine.y1 - drawingLine.y2) > 2) {
-        const newId = crypto.randomUUID()
-        setObjects(prev => [...prev, {
-          id: newId,
-          type: 'polyline',
-          points: [{ x: drawingLine.x1, y: drawingLine.y1 }, { x: drawingLine.x2, y: drawingLine.y2 }],
-          closed: false,
-          stroke: '#0f172a',
-          fillEnabled: false,
-          fillColor: 'transparent',
-          strokeWidth: 2
-        }])
-        setSelectedId(null)
+      if (tool === 'circle') {
+        addObject({ id: crypto.randomUUID(), type: 'circle', x: p1.x, y: p1.y, radius: clickOnly ? 40 : dist(p1, p2), ...strokeProps(), ...fill })
+        return
       }
-      setDrawingLine(null)
-      setIsLineMode(false)
-    }
-
-    if (drawingFreehand) {
-      if (drawingFreehand.length > 2) {
-        const newId = crypto.randomUUID()
-        setObjects(prev => [...prev, {
-          id: newId,
-          type: 'polyline',
-          points: drawingFreehand,
-          closed: false,
-          stroke: '#0f172a',
-          fillEnabled: false,
-          fillColor: 'transparent',
-          strokeWidth: 2
-        }])
-        setSelectedId(null)
+      if (clickOnly) return
+      if (tool === 'line') {
+        addObject({
+          id: crypto.randomUUID(), type: 'polyline', points: [p1, p2], closed: false,
+          ...strokeProps(), fillEnabled: false,
+        })
+      } else if (tool === 'arrow') {
+        addObject({
+          id: crypto.randomUUID(), type: 'arrow', x: 0, y: 0,
+          x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, ...strokeProps(),
+        })
+      } else if (tool === 'bolt') {
+        addObject({
+          id: crypto.randomUUID(), type: 'bolt', x: p1.x, y: p1.y, p1, p2,
+          diameter: 16, spacingX: '100', spacingY: '50', offsetX: 0, offsetY: 0,
+          viewType: 'top', length: 60, stroke: drawStyle.stroke,
+        })
       }
-      setDrawingFreehand(null)
-      setIsFreehandMode(false)
     }
 
-
-
-    rotationRef.current = null
-    boltGripRef.current = null
-    quoteGripRef.current = null
-    dragRef.current = null
-    resizeRef.current = null
-    polylineGripRef.current = null
-    symbolGripRef.current = null
-    arrowGripRef.current = null
-    panRef.current = null
+    if (a.kind === 'freehand' && freehand) {
+      if (freehand.length > 2) {
+        addObject({
+          id: crypto.randomUUID(), type: 'polyline', points: freehand, closed: false,
+          ...strokeProps(), fillEnabled: false,
+        })
+      }
+      setFreehand(null)
+    }
   }
 
+  /* ---------- rendering ---------- */
 
-  const gridLines = []
-  for (let x = 0; x <= GRID_EXTENT; x += gridSize) {
-    gridLines.push(
-      <line
-        key={`gx-${x}`}
-        x1={x}
-        y1={0}
-        x2={x}
-        y2={GRID_EXTENT}
-        stroke="#cbd5e1"
-        strokeWidth={0.5}
-        strokeDasharray="1,4"
-      />
-    )
-  }
-  for (let y = 0; y <= GRID_EXTENT; y += gridSize) {
-    gridLines.push(
-      <line
-        key={`gy-${y}`}
-        x1={0}
-        y1={y}
-        x2={GRID_EXTENT}
-        y2={y}
-        stroke="#cbd5e1"
-        strokeWidth={0.5}
-        strokeDasharray="1,4"
-      />
-    )
-  }
+  const interactiveObjects = tool === 'select' || tool === 'wand'
+  const cursor =
+    tool === 'select' ? 'default' : tool === 'wand' ? 'crosshair' : isCreationTool(tool) || tool === 'crop' ? 'crosshair' : 'default'
+
+  const k = 1 / zoom
+  const draftStroke = { stroke: ACCENT, strokeWidth: 1.5 * k, strokeDasharray: `${5 * k} ${4 * k}`, fill: 'none', pointerEvents: 'none' as const }
+  const visible = { x: view.x, y: view.y, w: size.w / zoom, h: size.h / zoom }
+
+  // Griglia: linee minori + maggiori ogni 5 passi. Nascosta se troppo fitta.
+  const minorPx = gridSize * zoom
+  const showMinor = minorPx >= 8
 
   return (
     <>
       <svg
-      ref={svgRef}
-      className="canvas"
-      width="100%"
-      height="100%"
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-      onWheel={onWheel}
-      onMouseDown={e => {
-        if (isArrowMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          setDrawingArrow({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
-          return
-        }
+        ref={svgRef}
+        className="canvas"
+        width="100%"
+        height="100%"
+        style={{ cursor, display: 'block', background: 'white' }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        onWheel={onWheel}
+        onContextMenu={e => e.preventDefault()}
+      >
+        <defs>
+          <pattern id="grid-minor" width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+            <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} fill="none" stroke="#e2e8f0" strokeWidth={1 * k} />
+          </pattern>
+          <pattern id="grid-major" width={gridSize * 5} height={gridSize * 5} patternUnits="userSpaceOnUse">
+            <path d={`M ${gridSize * 5} 0 L 0 0 0 ${gridSize * 5}`} fill="none" stroke="#cbd5e1" strokeWidth={1 * k} />
+          </pattern>
+          {objects.map(o =>
+            o.type === 'image' && o.clipPoints && o.clipPoints.length > 2 ? (
+              <clipPath id={`clip-${o.id}`} key={o.id} clipPathUnits="userSpaceOnUse">
+                <polygon points={o.clipPoints.map(p => `${p.x + o.x},${p.y + o.y}`).join(' ')} />
+              </clipPath>
+            ) : null,
+          )}
+        </defs>
 
-        if (isBoltMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          setDrawingBolt({ p1: snapped, p2: snapped })
-          return
-        }
+        <g transform={`scale(${zoom}) translate(${-view.x}, ${-view.y})`}>
+          {showGrid && (
+            <g id="grid-layer" pointerEvents="none">
+              {showMinor && <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-minor)" />}
+              <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-major)" />
+            </g>
+          )}
 
-        if (isLineMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          const snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          setDrawingLine({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
-          return
-        }
-
-        if (isQuoteMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          
-          if (!drawingQuote) {
-            setDrawingQuote({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y })
-          } else {
-             if (orthoEnabled || e.shiftKey) {
-                 const dx = snapped.x - drawingQuote.x1
-                 const dy = snapped.y - drawingQuote.y1
-                 if (Math.abs(dx) > Math.abs(dy)) snapped.y = drawingQuote.y1
-                 else snapped.x = drawingQuote.x1
-             }
-             if (Math.abs(drawingQuote.x1 - snapped.x) > 5 || Math.abs(drawingQuote.y1 - snapped.y) > 5) {
-                 const newId = crypto.randomUUID()
-                 setObjects(prev => [...prev, {
-                     id: newId,
-                     type: 'quote',
-                     x1: drawingQuote.x1,
-                     y1: drawingQuote.y1,
-                     x2: snapped.x,
-                     y2: snapped.y,
-                     stroke: '#000000',
-                     strokeWidth: 1,
-                     x: 0, y: 0 // base props
-                 }])
-                 setSelectedId(null)
-             }
-             setDrawingQuote(null)
-             setIsQuoteMode(false)
-          }
-          return
-        }
-
-        if (isMeasureMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          const shouldSnap = snapEnabled || e.ctrlKey || e.metaKey
-          let snapped = shouldSnap ? getSnapPoint(wx, wy) : { x: wx, y: wy }
-          
-          if (!measureStart) {
-            setMeasureStart(snapped)
-            setDrawingMeasure(snapped)
-          } else {
-             if (orthoEnabled || e.shiftKey) {
-               const dx = snapped.x - measureStart.x
-               const dy = snapped.y - measureStart.y
-               if (Math.abs(dx) > Math.abs(dy)) snapped.y = measureStart.y
-               else snapped.x = measureStart.x
-             }
-             // Finish measure
-             const dist = Math.sqrt((snapped.x - measureStart.x)**2 + (snapped.y - measureStart.y)**2)
-             setMeasureResult({ p1: measureStart, p2: snapped, distance: dist })
-             setMeasureStart(null)
-             setDrawingMeasure(null)
-             setIsMeasureMode(false)
-          }
-          return
-        }
-
-        if (isFreehandMode) {
-          const p = getSvgPoint(e)
-          const wx = (p.x / zoom) + view.x
-          const wy = (p.y / zoom) + view.y
-          setDrawingFreehand([{ x: wx, y: wy }])
-          return
-        }
-
-        if (e.target === e.currentTarget) {
-          setSelectedId(null)
-          panRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            viewX: view.x,
-            viewY: view.y,
-          }
-        }
-      }}
-
-      onClick={e => {
-        if (!drawingPolyline) return
-        if (e.detail > 1) return
-
-
-        const p = getSvgPoint(e)
-        const wx = (p.x / zoom) + view.x
-        const wy = (p.y / zoom) + view.y
-        const snapped = getSnapPoint(wx, wy)
-
-        setDrawingPolyline(prev =>
-          prev ? [...prev, snapped] : prev
-        )
-      }}
-      onDoubleClick={e => {
-        e.stopPropagation()
-
-        if (!drawingPolyline || drawingPolyline.length < 2) return
-
-        const first = drawingPolyline[0]
-        const closed = [...drawingPolyline, first]
-        const newId = crypto.randomUUID()
-
-        setObjects(objs => [
-          ...objs,
-          {
-            id: newId,
-            type: 'polyline',
-            points: closed,
-            closed: true,
-            stroke: '#0f172a',
-            fillEnabled: false,
-            fillColor: 'transparent',
-          },
-        ])
-
-        setDrawingPolyline(null)
-        setSelectedId(null)
-      }}
-    >
-      <defs />
-
-      <g transform={`scale(${zoom}) translate(${-view.x}, ${-view.y})`}>
-        {/* griglia */}
-        <g id="grid-layer" pointerEvents="none">{gridLines}</g>
-
-        {/* polyline in costruzione */}
-        {drawingPolyline && (
-          <polyline
-            points={drawingPolyline.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="#6366f1"
-            strokeWidth={2}
-            strokeDasharray="4,2"
-            pointerEvents="none"
-          />
-        )}
-
-        {drawingArrow && (
-          <line
-            x1={drawingArrow.x1}
-            y1={drawingArrow.y1}
-            x2={drawingArrow.x2}
-            y2={drawingArrow.y2}
-            stroke="#6366f1"
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            pointerEvents="none"
-          />
-        )}
-
-        {drawingLine && (
-          <line
-            x1={drawingLine.x1}
-            y1={drawingLine.y1}
-            x2={drawingLine.x2}
-            y2={drawingLine.y2}
-            stroke="#0f172a"
-            strokeWidth={2}
-            pointerEvents="none"
-          />
-        )}
-        
-        {drawingQuote && (
-          <line
-            x1={drawingQuote.x1}
-            y1={drawingQuote.y1}
-            x2={drawingQuote.x2}
-            y2={drawingQuote.y2}
-            stroke="#000000"
-            strokeWidth={1}
-            strokeDasharray="4,4"
-            pointerEvents="none"
-          />
-        )}
-        
-        {drawingMeasure && measureStart && (
-          <line
-            x1={measureStart.x}
-            y1={measureStart.y}
-            x2={drawingMeasure.x}
-            y2={drawingMeasure.y}
-            stroke="red"
-            strokeWidth={1}
-            strokeDasharray="4,4"
-            pointerEvents="none"
-          />
-        )}
-
-        {drawingFreehand && (
-          <polyline
-            points={drawingFreehand.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="#0f172a"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            pointerEvents="none"
-          />
-        )}
-
-
-        {drawingBolt && (
-          <g pointerEvents="none">
-            <line
-              x1={drawingBolt.p1.x}
-              y1={drawingBolt.p1.y}
-              x2={drawingBolt.p2.x}
-              y2={drawingBolt.p2.y}
-              stroke="orange"
-              strokeDasharray="5,5"
-            />
-            <circle cx={drawingBolt.p1.x} cy={drawingBolt.p1.y} r={3} fill="orange" />
-            <circle cx={drawingBolt.p2.x} cy={drawingBolt.p2.y} r={3} fill="orange" />
-          </g>
-        )}
-
-        {drawingPolyline &&
-          drawingPolyline.map((p, i) => (
-            <circle
-              key={`drawing-grip-${i}`}
-              cx={p.x}
-              cy={p.y}
-              r={4}
-              fill="white"
-              stroke="#6366f1"
-              strokeWidth={2}
-              pointerEvents="none"
+          {objects.map(o => (
+            <ObjectView
+              key={o.id}
+              o={o}
+              interactive={interactiveObjects}
+              onMouseDown={onObjectMouseDown}
+              onDoubleClick={onObjectDoubleClick}
+              hideText={o.id === editingId}
+              imageSrcOverride={wand?.id === o.id && wand.previewSrc ? wand.previewSrc : undefined}
             />
           ))}
 
-        {/* oggetti */}
-        {objects.map(o => {
-          const isSelected = o.id === selectedId
-          const isCreationMode = isArrowMode || isBoltMode || isLineMode || isFreehandMode || isQuoteMode || isMeasureMode || !!drawingPolyline
-          const basePointerEvents = isCreationMode ? 'none' : 'all'
+          <g id="ui-layer">
+            {selected && tool === 'select' && selected.id !== editingId && <SelectionOverlay o={selected} zoom={zoom} onGrip={onGrip} />}
 
-          // Use explicit fill or fillOpacity=0 for hit testing
-          const hasFill = o.fillEnabled
-          const fillColor = o.fillColor || '#cbd5e1'
-          const strokeValue = isSelected ? '#6366f1' : o.stroke || '#0f172a'
-          const baseStrokeWidth = o.strokeWidth || 1.5
-          const strokeWidth = isSelected ? baseStrokeWidth + 1 : baseStrokeWidth
+            {/* immagine in scontorno/bacchetta: evidenzia */}
+            {selected && (tool === 'crop' || tool === 'wand' || (tool === 'scale' && scaleTargetId)) && (() => {
+              const b = getObjectBounds(selected)
+              return <rect x={b.x} y={b.y} width={b.w} height={b.h} {...draftStroke} />
+            })()}
 
-          let finalFill = fillColor
-          let finalOpacity = 0
-
-          if (hasFill) {
-            finalFill = fillColor
-            finalOpacity = 1
-          } else if (isSelected) {
-            finalFill = 'rgba(99, 102, 241, 0.1)'
-            finalOpacity = 1
-          }
-
-          const center = getObjectCenter(o)
-          const rotation = (o as any).rotation || 0
-          const rotateTransform = rotation ? `rotate(${rotation}, ${center.x}, ${center.y})` : ''
-
-          if (o.type === 'rect' || o.type === 'image') {
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                {o.type === 'rect' ? (
-                  <rect
-                    x={o.x}
-                    y={o.y}
-                    width={o.width}
-                    height={o.height}
-                    fill={finalFill}
-                    fillOpacity={finalOpacity}
-                    stroke={strokeValue}
-                    strokeWidth={strokeWidth}
-                    onMouseDown={e => onObjectMouseDown(e, o)}
-                    style={{ pointerEvents: basePointerEvents }}
-                  />
-                ) : (
-                  <image
-                    href={o.src}
-                    x={o.x}
-                    y={o.y}
-                    width={o.width}
-                    height={o.height}
-                    opacity={o.opacity}
-                    onMouseDown={e => onObjectMouseDown(e, o)}
-                    style={{ outline: isSelected ? '2px solid orange' : 'none', pointerEvents: basePointerEvents }}
-                  />
-                )}
-
-                {/* Grip di resize (solo se selezionato) */}
-                {isSelected && (
-                  <>
-                    {([
-                      { x: o.x, y: o.y, corner: 'tl' },
-                      { x: o.x + o.width, y: o.y, corner: 'tr' },
-                      { x: o.x, y: o.y + o.height, corner: 'bl' },
-                      { x: o.x + o.width, y: o.y + o.height, corner: 'br' },
-                    ] as const).map(h => (
-                      <circle
-                        key={h.corner}
-                        cx={h.x}
-                        cy={h.y}
-                        r={6}
-                        fill="white"
-                        stroke="black"
-                        strokeWidth={1}
-                        cursor="nwse-resize"
-                        onMouseDown={e => {
-                          e.stopPropagation()
-                          resizeRef.current = {
-                            id: o.id,
-                            corner: h.corner,
-                          }
-                        }}
-                      />
-                    ))}
-                  </>
-                )}
+            {/* bozze */}
+            {segment && tool === 'line' && (
+              <line x1={segment.p1.x} y1={segment.p1.y} x2={segment.p2.x} y2={segment.p2.y}
+                stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
+                strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)} pointerEvents="none" />
+            )}
+            {segment && tool === 'rect' && (
+              <rect
+                x={Math.min(segment.p1.x, segment.p2.x)} y={Math.min(segment.p1.y, segment.p2.y)}
+                width={Math.abs(segment.p2.x - segment.p1.x)} height={Math.abs(segment.p2.y - segment.p1.y)}
+                fill={drawStyle.fillEnabled ? drawStyle.fillColor : 'none'}
+                stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
+                strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)} pointerEvents="none"
+              />
+            )}
+            {segment && tool === 'circle' && (
+              <circle
+                cx={segment.p1.x} cy={segment.p1.y} r={dist(segment.p1, segment.p2)}
+                fill={drawStyle.fillEnabled ? drawStyle.fillColor : 'none'}
+                stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
+                strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)} pointerEvents="none"
+              />
+            )}
+            {segment && tool !== 'line' && tool !== 'rect' && tool !== 'circle' && (
+              <g pointerEvents="none">
+                <line x1={segment.p1.x} y1={segment.p1.y} x2={segment.p2.x} y2={segment.p2.y}
+                  {...draftStroke} stroke={tool === 'measure' ? '#dc2626' : tool === 'scale' ? '#f59e0b' : ACCENT} />
+                <circle cx={segment.p1.x} cy={segment.p1.y} r={3 * k} fill={ACCENT} />
+                <text x={segment.p2.x + 10 * k} y={segment.p2.y - 10 * k} fontSize={12 * k} fill="#0f172a"
+                  style={{ userSelect: 'none' }}>
+                  {round1(dist(segment.p1, segment.p2))}
+                </text>
               </g>
-            )
-          }
-
-
-          if (o.type === 'polyline') {
-            const fillValue =
-              o.fillEnabled && o.fillColor ? o.fillColor : (isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent')
-
-            const pointerMode = 'all'
-            const polyStrokeWidth = o.strokeWidth || 2
-
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                {/* Polyline */}
+            )}
+            {measure && (
+              <g pointerEvents="none">
+                <line x1={measure.p1.x} y1={measure.p1.y} x2={measure.p2.x} y2={measure.p2.y}
+                  stroke="#dc2626" strokeWidth={1.5 * k} />
+                <circle cx={measure.p1.x} cy={measure.p1.y} r={3 * k} fill="#dc2626" />
+                <circle cx={measure.p2.x} cy={measure.p2.y} r={3 * k} fill="#dc2626" />
+              </g>
+            )}
+            {polyPoints && (
+              <g pointerEvents="none">
                 <polyline
-                  points={o.points.map(p => `${p.x},${p.y}`).join(' ')}
-                  fill={fillValue}
-                  stroke={strokeValue}
-                  strokeWidth={isSelected ? polyStrokeWidth + 1 : polyStrokeWidth}
-                  pointerEvents={basePointerEvents}
-                  onMouseDown={e => {
-                    e.stopPropagation()
-                    onObjectMouseDown(e, o)
-                  }}
+                  points={[...polyPoints, ...(hover ? [hover] : [])].map(p => `${p.x},${p.y}`).join(' ')}
+                  fill="none" stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
+                  strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)}
                 />
-
-                {/* Grip sui vertici */}
-                {isSelected &&
-                  o.points.map((p, i) => (
-                    <circle
-                      key={i}
-                      cx={p.x}
-                      cy={p.y}
-                      r={6}
-                      fill="white"
-                      stroke="black"
-                      strokeWidth={1}
-                      cursor="move"
-                      onMouseDown={e => {
-                        e.stopPropagation()
-                        polylineGripRef.current = {
-                          id: o.id,
-                          index: i,
-                        }
-                      }}
-                    />
-                  ))}
+                {polyPoints.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r={(i === 0 ? 5 : 3) * k} fill="white" stroke={ACCENT} strokeWidth={1.5 * k} />
+                ))}
               </g>
-            )
-          }
-
-
-
-
-
-          if (o.type === 'text') {
-            const fontSize = o.fontSize || 20
-            const padding = o.boxPadding || 10
-
-            // If width/height are specified, use them. Otherwise estimate.
-            const w = o.width || (o.text.length * (fontSize * 0.6) + padding * 2)
-            const h = o.height || (fontSize + padding * 2)
-
-            const isSelected = o.id === selectedId
-
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                <g onMouseDown={(e: React.MouseEvent) => onObjectMouseDown(e, o)}>
-                  {o.boxEnabled && (
-                    <rect
-                      x={o.x}
-                      y={o.y}
-                      width={w}
-                      height={h}
-                      fill={o.fillEnabled ? (o.fillColor || 'white') : 'transparent'}
-                      stroke={o.stroke || '#000000'}
-                      strokeWidth={o.strokeWidth || 2}
-                      style={{ pointerEvents: basePointerEvents }}
-                    />
-                  )}
-                  <text
-                    x={o.x + w / 2}
-                    y={o.y + h / 2}
-                    fontSize={fontSize}
-                    fill={o.textColor || '#000000'}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    style={{ userSelect: 'none', cursor: 'move' }}
-                  >
-                    {o.text}
-                  </text>
-                </g>
-
-                {/* Resize handles for text box */}
-                {isSelected && o.boxEnabled && (
-                  <>
-                    {([
-                      { x: o.x, y: o.y, corner: 'tl' },
-                      { x: o.x + w, y: o.y, corner: 'tr' },
-                      { x: o.x, y: o.y + h, corner: 'bl' },
-                      { x: o.x + w, y: o.y + h, corner: 'br' },
-                    ] as const).map(handle => (
-                      <circle
-                        key={handle.corner}
-                        cx={handle.x}
-                        cy={handle.y}
-                        r={6}
-                        fill="white"
-                        stroke="black"
-                        cursor="nwse-resize"
-                        onMouseDown={e => {
-                          e.stopPropagation()
-                          resizeRef.current = { id: o.id, corner: handle.corner }
-                        }}
-                      />
-                    ))}
-                  </>
-                )}
-              </g>
-            )
-          }
-
-          if (o.type === 'arrow') {
-            const isSelected = o.id === selectedId
-            const color = isSelected ? 'orange' : (o.stroke || '#000000')
-            const sw = o.strokeWidth || 2
-
-            const angle = Math.atan2(o.y2 - o.y1, o.x2 - o.x1) * (180 / Math.PI)
-            const headLen = Math.max(2, sw * 4)
-
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                {/* Hit area (invibile ma più larga per selezione facile) */}
-                <line
-                  x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2}
-                  stroke="transparent"
-                  strokeWidth={Math.max(15, sw + 10)}
-                  style={{ pointerEvents: basePointerEvents }}
-                  onMouseDown={(e) => onObjectMouseDown(e, o)}
-                  cursor="pointer"
-                />
-                {/* Visible line */}
-                <line
-                  x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2}
-                  stroke={color}
-                  strokeWidth={sw}
-                  strokeLinecap="butt"
-                  pointerEvents="none"
-                />
-                {/* Arrowhead */}
-                <g transform={`translate(${o.x2}, ${o.y2}) rotate(${angle})`} pointerEvents="none">
-                  <path
-                    d={`M ${headLen * 0.3} 0 L ${-headLen} ${-headLen / 2} L ${-headLen} ${headLen / 2} Z`}
-                    fill={color}
-                  />
-                </g>
-
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={o.x1} cy={o.y1} r={6}
-                      fill="white" stroke="black"
-                      cursor="move"
-                      onMouseDown={e => {
-                        e.stopPropagation()
-                        arrowGripRef.current = { id: o.id, point: 'p1' }
-                      }}
-                    />
-                    <circle
-                      cx={o.x2} cy={o.y2} r={6}
-                      fill="white" stroke="black"
-                      cursor="move"
-                      onMouseDown={e => {
-                        e.stopPropagation()
-                        arrowGripRef.current = { id: o.id, point: 'p2' }
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            )
-          }
-
-          if (o.type === 'quote') {
-            const isSelected = o.id === selectedId
-            const color = isSelected ? 'orange' : (o.stroke || '#000000')
-            const sw = o.strokeWidth || 1
-            const dx = o.x2 - o.x1
-            const dy = o.y2 - o.y1
-            const angle = Math.atan2(dy, dx)
-            const angleDeg = angle * (180 / Math.PI)
-            const dist = Math.sqrt(dx * dx + dy * dy)
-            const displayDist = Math.round(dist * 10) / 10
-            const textValue = o.text || `${displayDist}`
-            
-            const tick = 6 + sw * 2
-            
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                {/* Hit area */}
-                <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent" strokeWidth={Math.max(15, sw + 10)} style={{ pointerEvents: basePointerEvents }} onMouseDown={(e) => onObjectMouseDown(e, o)} cursor="pointer" />
-                
-                {/* Main line */}
-                <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke={color} strokeWidth={sw} pointerEvents="none" />
-                
-                {/* Ticks */}
-                <g transform={`translate(${o.x1}, ${o.y1}) rotate(${angleDeg})`} pointerEvents="none">
-                   <line x1={0} y1={-tick} x2={0} y2={tick} stroke={color} strokeWidth={sw} />
-                </g>
-                <g transform={`translate(${o.x2}, ${o.y2}) rotate(${angleDeg})`} pointerEvents="none">
-                   <line x1={0} y1={-tick} x2={0} y2={tick} stroke={color} strokeWidth={sw} />
-                </g>
-                
-                {/* Text centered */}
-                <g transform={`translate(${(o.x1+o.x2)/2}, ${(o.y1+o.y2)/2}) rotate(${angleDeg})`} pointerEvents="none">
-                  <text x={0} y={- (4 + sw)} fill={o.textColor || color} fontSize={14} textAnchor="middle" dominantBaseline="auto" pointerEvents="none">{textValue}</text>
-                </g>
-
-                {isSelected && (
-                  <>
-                    <circle cx={o.x1} cy={o.y1} r={6} fill="white" stroke="black" cursor="move" onMouseDown={e => { e.stopPropagation(); quoteGripRef.current = { id: o.id, point: 'p1' } }} />
-                    <circle cx={o.x2} cy={o.y2} r={6} fill="white" stroke="black" cursor="move" onMouseDown={e => { e.stopPropagation(); quoteGripRef.current = { id: o.id, point: 'p2' } }} />
-                  </>
-                )}
-              </g>
-            )
-          }
-
-          if (o.type === 'bolt') {
-            const isSelected = o.id === selectedId
-            const points = getBoltPositions(o)
-            const headPath = getBoltHeadPath(o.diameter)
-
-            return (
-              <g key={o.id} transform={rotateTransform}>
-                {/* Axis Line */}
-                <line
-                  x1={o.p1.x} y1={o.p1.y} x2={o.p2.x} y2={o.p2.y}
-                  stroke={isSelected ? "orange" : "#cbd5e1"}
-                  strokeWidth={1}
-                  strokeDasharray="5,5"
-                  pointerEvents="none"
-                />
-
-                {/* Bolts */}
-                {points.map((p, i) => {
-                  if (o.viewType === 'side') {
-                    const sideShapes = getBoltSideShapes(o.diameter, o.length)
-                    // Angle of the axis line
-                    const angleRad = Math.atan2(o.p2.y - o.p1.y, o.p2.x - o.p1.x)
-                    const angleDeg = (angleRad * 180) / Math.PI + 90 // Perpendicular to axis
-
-                    return (
-                      <g key={i} transform={`translate(${p.x}, ${p.y}) rotate(${angleDeg})`}>
-                        {sideShapes.map((s, si) => (
-                          <path
-                            key={si}
-                            d={s.d}
-                            fill="none"
-                            stroke={isSelected ? "orange" : "black"}
-                            strokeWidth={1}
-                          />
-                        ))}
-                      </g>
-                    )
-                  }
-
-                  return (
-                    <g key={i} transform={`translate(${p.x}, ${p.y})`}>
-                      <path
-                        d={headPath}
-                        fill="none"
-                        stroke={isSelected ? "orange" : "black"}
-                        strokeWidth={1}
-                      />
-                      <line x1={-o.diameter / 5} y1={0} x2={o.diameter / 5} y2={0} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
-                      <line x1={0} y1={-o.diameter / 5} x2={0} y2={o.diameter / 5} stroke={isSelected ? "orange" : "black"} strokeWidth={0.5} />
-                    </g>
-                  )
-                })}
-
-                {/* Hit Area */}
-                <line
-                  x1={o.p1.x} y1={o.p1.y} x2={o.p2.x} y2={o.p2.y}
-                  stroke="transparent"
-                  strokeWidth={20}
-                  cursor="pointer"
-                  style={{ pointerEvents: basePointerEvents }}
-                  onMouseDown={(e) => onObjectMouseDown(e, o)}
-                />
-
-                {/* Grips */}
-                {isSelected && (
-                  <>
-                    <circle
-                      cx={o.p1.x} cy={o.p1.y} r={6}
-                      fill="white" stroke="black"
-                      cursor="move"
-                      onMouseDown={e => {
-                        e.stopPropagation()
-                        boltGripRef.current = { id: o.id, point: 'p1' }
-                      }}
-                    />
-                    <circle
-                      cx={o.p2.x} cy={o.p2.y} r={6}
-                      fill="white" stroke="black"
-                      cursor="move"
-                      onMouseDown={e => {
-                        e.stopPropagation()
-                        boltGripRef.current = { id: o.id, point: 'p2' }
-                      }}
-                    />
-                  </>
-                )}
-              </g>
-            )
-          }
-
-          if (o.type === 'symbol') {
-            const isSelected = o.id === selectedId
-            if (o.symbolType === 'bubble') {
-              return (
-                <g key={o.id} transform={rotateTransform} onMouseDown={(e: React.MouseEvent) => onObjectMouseDown(e, o)}>
-                  <circle
-                    cx={o.x}
-                    cy={o.y}
-                    r={15}
-                    fill={o.fillEnabled ? (o.fillColor || '#ffff00') : 'transparent'}
-                    stroke={o.stroke || '#000000'}
-                    strokeWidth={o.strokeWidth || 2}
-                    style={{ pointerEvents: basePointerEvents }}
-                  />
-                  <text
-                    x={o.x}
-                    y={o.y}
-                    fontSize={14}
-                    fill="black"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontWeight="bold"
-                    style={{ userSelect: 'none', pointerEvents: 'none' }}
-                  >
-                    {o.value}
-                  </text>
-                </g>
-              )
-            }
-            return null
-          }
-
-          if (o.type === 'circle') {
-            return (
-              <circle
-                key={o.id}
-                cx={o.x}
-                cy={o.y}
-                r={o.radius}
-                fill={finalFill}
-                fillOpacity={finalOpacity}
-                stroke={strokeValue}
-                strokeWidth={strokeWidth}
-                transform={rotateTransform}
-                onMouseDown={e => onObjectMouseDown(e, o)}
-                style={{ cursor: 'move', pointerEvents: basePointerEvents }}
+            )}
+            {freehand && (
+              <polyline
+                points={freehand.map(p => `${p.x},${p.y}`).join(' ')}
+                fill="none" stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
+                strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)}
+                strokeLinejoin="round" strokeLinecap="round" pointerEvents="none"
               />
-            )
-          }
-
-          if (o.type === 'profile') {
-            const profile = ALL_PROFILES.find(p => p.name === o.profileName)
-            if (!profile) return null
-            const s = o.scale
-
-            const { path: mainPath, dashed: dashedPath } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
-
-            return (
-              <g key={o.id}
-                transform={`${rotateTransform} translate(${o.x}, ${o.y}) scale(${s})`}
-                onMouseDown={e => onObjectMouseDown(e, o)}
-                style={{ pointerEvents: basePointerEvents }}>
-                <path
-                  d={mainPath}
-                  fill={finalFill}
-                  fillOpacity={finalOpacity}
-                  stroke={strokeValue}
-                  strokeWidth={strokeWidth / s} // Counter-scale stroke
-                  vectorEffect="non-scaling-stroke"
-                  style={{ pointerEvents: 'all' }}
+            )}
+            {cropPoints && selected?.type === 'image' && (
+              <g transform={selected.rotation ? `rotate(${selected.rotation}, ${getObjectCenter(selected).x}, ${getObjectCenter(selected).y})` : undefined}>
+                <polyline
+                  points={cropPoints.map(p => `${p.x + selected.x},${p.y + selected.y}`).join(' ')}
+                  {...draftStroke} stroke="#f59e0b"
                 />
-                {dashedPath && (
-                  <path
-                    d={dashedPath}
-                    fill="none"
-                    stroke={strokeValue}
-                    strokeWidth={(strokeWidth / 2) / s} // Slightly thinner hidden lines
-                    strokeDasharray="4 2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
               </g>
-            )
-          }
-
-          return null
-        })}
-
-        {/* GONIOMETRO (Rotation Protractor) */}
-        {selectedId && (() => {
-          const selObj = objects.find(o => o.id === selectedId)
-          if (!selObj) return null
-
-          const center = getObjectCenter(selObj)
-          const rot = (selObj as any).rotation || 0
-
-          // Determine a reasonable radius for the protractor
-          let r = 50
-          if (selObj.type === 'rect' || selObj.type === 'image') {
-            r = Math.max(selObj.width, selObj.height) / 2 + 40
-          } else if (selObj.type === 'circle') {
-            r = selObj.radius + 40
-          } else if (selObj.type === 'profile') {
-            r = Math.max(selObj.length * selObj.scale, 100) / 2 + 40
-          } else if (selObj.type === 'polyline') {
-            // rough estimate
-            r = 100
-          }
-
-          const handleR = 8
-          const handleAngle = (rot - 90) * Math.PI / 180 // Start top
-          const handleX = center.x + r * Math.cos(handleAngle)
-          const handleY = center.y + r * Math.sin(handleAngle)
-
-          return (
-            <g className="protractor-overlay">
-              {/* Main Ring */}
-              <circle
-                cx={center.x}
-                cy={center.y}
-                r={r}
-                fill="none"
-                stroke="rgba(99, 102, 241, 0.3)"
-                strokeWidth={2}
-                strokeDasharray="4 4"
-                pointerEvents="none"
-              />
-
-              {/* Rotation Handle */}
-              <circle
-                cx={handleX}
-                cy={handleY}
-                r={handleR}
-                fill="white"
-                stroke="#6366f1"
-                strokeWidth={2}
-                cursor="alias"
-                onMouseDown={e => {
-                  e.stopPropagation()
-                  const p = getSvgPoint(e)
-                  const wx = (p.x / zoom) + view.x
-                  const wy = (p.y / zoom) + view.y
-                  const angle = Math.atan2(wy - center.y, wx - center.x) * 180 / Math.PI
-                  rotationRef.current = {
-                    id: selectedId,
-                    cx: center.x,
-                    cy: center.y,
-                    startAngle: angle,
-                    initialRotation: rot
-                  }
-                }}
-              />
-
-              {/* Degrees display */}
-              <text
-                x={center.x}
-                y={center.y + r + 20}
-                fill="#6366f1"
-                fontSize={12}
-                textAnchor="middle"
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                {round1(rot)}°
-              </text>
-            </g>
-          )
-        })()}
-
-        {drawingArrow && (
-          <line
-            x1={drawingArrow.x1}
-            y1={drawingArrow.y1}
-            x2={drawingArrow.x2}
-            y2={drawingArrow.y2}
-            stroke="black"
-            strokeWidth={2}
-            pointerEvents="none"
-          />
-        )}
-
-        {drawingBolt && (
-          <g pointerEvents="none">
-            <line
-              x1={drawingBolt.p1.x}
-              y1={drawingBolt.p1.y}
-              x2={drawingBolt.p2.x}
-              y2={drawingBolt.p2.y}
-              stroke="orange"
-              strokeDasharray="5,5"
-            />
-            <circle cx={drawingBolt.p1.x} cy={drawingBolt.p1.y} r={3} fill="orange" />
-            <circle cx={drawingBolt.p2.x} cy={drawingBolt.p2.y} r={3} fill="orange" />
+            )}
           </g>
-        )}
-      </g>
-    </svg>
-    {measureResult && (
-      <div style={{
-          position: 'absolute',
-          top: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'white',
-          padding: '12px 20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          border: '1px solid #e2e8f0',
-          zIndex: 100,
-          display: 'flex',
-          gap: '24px',
-          alignItems: 'center'
-        }}>
-        <div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>Distanza Misurata</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#0f172a' }}>{Math.round(measureResult.distance * 10) / 10} mm</div>
-        </div>
-        <button
-          onClick={() => setMeasureResult(null)}
-          title="Chiudi"
-          style={{
-            border: 'none',
-            background: '#f1f5f9',
-            color: '#64748b',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            fontSize: '1rem',
+        </g>
+      </svg>
+
+      {wand && (
+        <WandPanel
+          state={wand}
+          setState={setWand}
+          onApply={() => {
+            if (wand.previewSrc) updateObject(wand.id, o => ({ ...o, src: wand.previewSrc! }))
+            setWand(null)
           }}
-        >
-          ✕
-        </button>
-      </div>
-    )}
+        />
+      )}
+
+      {editingId && (() => {
+        const t = objects.find(o => o.id === editingId)
+        if (!t || t.type !== 'text') return null
+        return (
+          <TextEditor
+            o={t}
+            zoom={zoom}
+            view={view}
+            onChange={text => updateObject(t.id, o => ({ ...o, text }))}
+            onDone={finishEditing}
+          />
+        )
+      })()}
+
+      {measure && <MeasurePanel distance={dist(measure.p1, measure.p2)} onClose={() => setMeasure(null)} />}
+
+      {scalePending && (
+        <ScalePanel
+          current={dist(scalePending.p1, scalePending.p2)}
+          onApply={target => {
+            const sf = target / dist(scalePending.p1, scalePending.p2)
+            const targetId = scaleTargetId ?? selectedId
+            if (targetId && isFinite(sf) && sf > 0) updateObject(targetId, o => scaleObject(o, scalePending.p1, sf))
+            setScalePending(null)
+            setTool('select')
+          }}
+          onCancel={() => setScalePending(null)}
+        />
+      )}
     </>
   )
 }
+
+/** Oggetto più in alto il cui ingombro contiene il punto (le immagini hanno la precedenza) */
+function findTopObjectAt(objects: CanvasObject[], p: Point): CanvasObject | null {
+  const inside = (o: CanvasObject) => {
+    const q = rotatePoint(p, getObjectCenter(o), -(o.rotation || 0))
+    const b = getObjectBounds(o)
+    return q.x >= b.x && q.x <= b.x + b.w && q.y >= b.y && q.y <= b.y + b.h
+  }
+  const hits = [...objects].reverse().filter(inside)
+  return hits.find(o => o.type === 'image') ?? hits[0] ?? null
+}
+
+/** Ridimensiona rettangolo/immagine/testo tenendo fisso l'angolo opposto */
+function resizeObject(start: CanvasObject, corner: Corner, p: Point, keepRatio: boolean): CanvasObject {
+  if (start.type !== 'rect' && start.type !== 'image' && start.type !== 'text') return start
+  const b = getObjectBounds(start)
+  const left = corner === 'tl' || corner === 'bl'
+  const top = corner === 'tl' || corner === 'tr'
+  const fx = left ? b.x + b.w : b.x
+  const fy = top ? b.y + b.h : b.y
+  let w = Math.max(5, left ? fx - p.x : p.x - fx)
+  let h = Math.max(5, top ? fy - p.y : p.y - fy)
+  // le immagini mantengono le proporzioni (Shift per deformare)
+  if (keepRatio && start.type === 'image' && b.w > 0 && b.h > 0) {
+    const ratio = b.w / b.h
+    if (w / h > ratio) h = w / ratio
+    else w = h * ratio
+  }
+  const x = left ? fx - w : fx
+  const y = top ? fy - h : fy
+  if (start.type === 'image') {
+    const sx = w / b.w
+    const sy = h / b.h
+    return {
+      ...start, x, y, width: w, height: h,
+      clipPoints: start.clipPoints?.map(c => ({ x: c.x * sx, y: c.y * sy })),
+    }
+  }
+  return { ...start, x, y, width: w, height: h }
+}
+

@@ -1,0 +1,74 @@
+import type { LucideIcon } from 'lucide-react'
+import {
+  MousePointer2,
+  Minus,
+  Activity,
+  PenTool,
+  ArrowUpRight,
+  CircleDot,
+  ArrowLeftRight,
+  Ruler,
+  Maximize,
+  Wand2,
+  Scissors,
+  Square,
+  Circle,
+  Type,
+} from 'lucide-react'
+
+/**
+ * Strumenti "modali": restano attivi finché l'utente non disegna (o preme Esc).
+ * Un solo strumento attivo alla volta: sostituisce i vecchi flag isXxxMode.
+ */
+export type ToolId =
+  | 'select'
+  | 'line'
+  | 'polyline'
+  | 'rect'
+  | 'circle'
+  | 'text'
+  | 'freehand'
+  | 'arrow'
+  | 'bolt'
+  | 'quote'
+  | 'measure'
+  | 'scale'
+  | 'wand'
+  | 'crop'
+
+export type ToolDef = {
+  id: ToolId
+  label: string
+  icon: LucideIcon
+  shortcut?: string
+  /** Lo strumento resta attivo dopo aver creato un oggetto */
+  sticky?: boolean
+  /** Richiede un'immagine selezionata */
+  needs?: 'image'
+  /** Attivando lo strumento la selezione corrente viene mantenuta */
+  keepSelection?: boolean
+  hint: string
+}
+
+export const TOOLS: Record<ToolId, ToolDef> = {
+  select: { id: 'select', label: 'Seleziona', icon: MousePointer2, shortcut: 'V', hint: 'Clic per selezionare, trascina lo sfondo per spostare la vista' },
+  line: { id: 'line', label: 'Linea', icon: Minus, shortcut: 'L', hint: 'Trascina per disegnare una linea (Shift = ortogonale)' },
+  polyline: { id: 'polyline', label: 'Polilinea', icon: Activity, shortcut: 'P', hint: 'Clic per aggiungere vertici · clic sul primo punto per chiudere · doppio clic o Invio per terminare' },
+  freehand: { id: 'freehand', label: 'Mano libera', icon: PenTool, shortcut: 'D', sticky: true, hint: 'Trascina per disegnare. Esc per terminare' },
+  rect: { id: 'rect', label: 'Rettangolo', icon: Square, shortcut: 'R', hint: 'Trascina per disegnare (Shift = quadrato), clic per dimensione standard' },
+  circle: { id: 'circle', label: 'Cerchio', icon: Circle, shortcut: 'C', hint: 'Trascina dal centro verso il bordo, clic per dimensione standard' },
+  text: { id: 'text', label: 'Testo', icon: Type, shortcut: 'T', hint: 'Clic dove inserire il testo e scrivi. Ctrl+Invio o Esc per terminare' },
+  arrow: { id: 'arrow', label: 'Freccia', icon: ArrowUpRight, shortcut: 'A', hint: 'Trascina dalla coda alla punta' },
+  bolt: { id: 'bolt', label: 'Bulloni', icon: CircleDot, shortcut: 'B', hint: 'Trascina lungo l\'asse della bullonatura' },
+  quote: { id: 'quote', label: 'Quota', icon: ArrowLeftRight, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
+  measure: { id: 'measure', label: 'Misura', icon: Ruler, shortcut: 'M', hint: 'Clic su due punti per misurare la distanza' },
+  scale: { id: 'scale', label: 'Scala con due punti', icon: Maximize, shortcut: 'K', keepSelection: true, hint: 'Clic su due punti di distanza nota dell\'immagine (o dell\'oggetto selezionato), poi inserisci la misura reale' },
+  wand: { id: 'wand', label: 'Bacchetta magica', icon: Wand2, needs: 'image', keepSelection: true, hint: 'Clic su un colore dell\'immagine per renderlo trasparente' },
+  crop: { id: 'crop', label: 'Scontorna', icon: Scissors, needs: 'image', keepSelection: true, hint: 'Clic sui vertici del contorno, doppio clic per applicare' },
+}
+
+/** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
+export const isCreationTool = (t: ToolId) =>
+  t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
+  t === 'bolt' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'rect' || t === 'circle' || t === 'text'

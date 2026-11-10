@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline'
   x: number
   y: number
   stroke?: string
@@ -8,7 +8,12 @@ export type BaseObject = {
   fillColor?: string
   fillEnabled?: boolean
   rotation?: number // Degrees
+  strokeDash?: StrokeDash
+  /** Bloccato: non si sposta, ridimensiona o elimina finché non viene sbloccato */
+  locked?: boolean
 }
+
+export type StrokeDash = 'solid' | 'dashed' | 'dotted'
 
 export type QuoteObject = BaseObject & {
   type: 'quote'
@@ -61,6 +66,8 @@ export type PolylineObject = {
   fillEnabled: boolean
   fillColor?: string
   rotation?: number
+  strokeDash?: StrokeDash
+  locked?: boolean
 }
 
 export type ImageObject = BaseObject & {
@@ -69,6 +76,7 @@ export type ImageObject = BaseObject & {
   width: number
   height: number
   opacity: number
+  clipPoints?: Point[]
 }
 
 export type ArrowObject = BaseObject & {

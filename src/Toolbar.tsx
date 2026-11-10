@@ -1,352 +1,131 @@
-import { Dispatch, SetStateAction } from 'react'
-import { CanvasObject, Point } from './types'
-import { captureSvgToClipboard } from './utils/capture'
+import type { ReactNode } from 'react'
+import type { CanvasObject } from './types'
+import type { ToolId } from './tools'
+import { TOOLS } from './tools'
 import {
-  Square,
-  Circle,
-  Type,
-  Hash,
-  ArrowUpRight,
-  Activity,
-  Zap,
-  Camera,
-  Layers,
-  CircleDot,
-  ChevronUp,
-  ChevronDown,
-  ChevronsUp,
-  ChevronsDown,
-  Minus,
-  PenTool,
-  Ruler,
-  ArrowLeftRight
+  Hash, Zap, Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
+  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose,
 } from 'lucide-react'
 
+export type AddKind = 'bubble' | 'profile'
+
 type Props = {
-  setObjects: Dispatch<SetStateAction<CanvasObject[]>>
-  setDrawingPolyline: Dispatch<SetStateAction<Point[] | null>>
-  getCenter: () => { x: number, y: number }
-  screenshotMode: 'grid' | 'white' | 'transparent'
+  tool: ToolId
+  setTool: (t: ToolId) => void
+  selected: CanvasObject | null
+  onAdd: (k: AddKind) => void
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+  onNew: () => void
+  onOpen: () => void
+  onSave: () => void
   onScreenshot: () => void
-  nextBubbleNumber: number
-  setNextBubbleNumber: Dispatch<SetStateAction<number>>
-  isArrowMode: boolean
-  setIsArrowMode: Dispatch<SetStateAction<boolean>>
-  isBoltMode: boolean
-  setIsBoltMode: Dispatch<SetStateAction<boolean>>
-  isLineMode: boolean
-  setIsLineMode: Dispatch<SetStateAction<boolean>>
-  isFreehandMode: boolean
-  setIsFreehandMode: Dispatch<SetStateAction<boolean>>
-  isQuoteMode: boolean
-  setIsQuoteMode: Dispatch<SetStateAction<boolean>>
-  isMeasureMode: boolean
-  setIsMeasureMode: Dispatch<SetStateAction<boolean>>
-  drawingPolyline: Point[] | null
-  bringToFront: () => void
-  sendToBack: () => void
-  bringForward: () => void
-  sendBackward: () => void
-  selectedId: string | null
+  onBringToFront: () => void
+  onSendToBack: () => void
+  onDuplicate: () => void
+  onDelete: () => void
+  onPaste: () => void
+  onToggleLock: () => void
+  panelOpen: boolean
+  togglePanel: () => void
 }
 
-export function Toolbar({
-  setObjects,
-  setDrawingPolyline,
-  getCenter,
-  screenshotMode,
-  onScreenshot,
-  nextBubbleNumber,
-  setNextBubbleNumber,
-  setIsArrowMode,
-  isArrowMode,
-  setIsBoltMode,
-  isBoltMode,
-  isLineMode,
-  setIsLineMode,
-  isFreehandMode,
-  setIsFreehandMode,
-  isQuoteMode,
-  setIsQuoteMode,
-  isMeasureMode,
-  setIsMeasureMode,
-  drawingPolyline,
-  bringToFront,
-  sendToBack,
-  bringForward,
-  sendBackward,
-  selectedId,
-}: Props) {
-  const addRect = () => {
-    const c = getCenter()
-    setObjects(o => [
-      ...o,
-      {
-        id: crypto.randomUUID(),
-        type: 'rect',
-        x: c.x - 50,
-        y: c.y - 30,
-        width: 100,
-        height: 60,
-        stroke: '#0f172a',
-        fillEnabled: false,
-        fillColor: '#6366f1',
-      },
-    ])
+const Btn = ({ title, onClick, active, disabled, children, className }: {
+  title: string; onClick: () => void; active?: boolean; disabled?: boolean; children: ReactNode; className?: string
+}) => (
+  <button
+    className={`tb-btn ${active ? 'active' : ''} ${className ?? ''}`}
+    title={title}
+    aria-label={title}
+    aria-pressed={active}
+    disabled={disabled}
+    onClick={onClick}
+  >
+    {children}
+  </button>
+)
+
+const Sep = () => <div className="tb-sep" />
+
+export function Toolbar(p: Props) {
+  const toolBtn = (id: ToolId) => {
+    const t = TOOLS[id]
+    const Icon = t.icon
+    const disabled = t.needs === 'image' && p.selected?.type !== 'image'
+    const why = disabled ? ' — seleziona prima un\'immagine' : ''
+    return (
+      <Btn
+        key={id}
+        title={`${t.label}${t.shortcut ? ` (${t.shortcut})` : ''}${why}`}
+        active={p.tool === id}
+        disabled={disabled}
+        onClick={() => p.setTool(p.tool === id ? 'select' : id)}
+      >
+        <Icon size={18} />
+      </Btn>
+    )
   }
 
-  const addCircle = () => {
-    const c = getCenter()
-    setObjects(o => [
-      ...o,
-      {
-        id: crypto.randomUUID(),
-        type: 'circle',
-        x: c.x,
-        y: c.y,
-        radius: 40,
-        stroke: '#0f172a',
-        fillEnabled: false,
-        fillColor: '#94a3b8',
-      },
-    ])
-  }
-
-  const addText = () => {
-    const c = getCenter()
-    setObjects(o => [
-      ...o,
-      {
-        id: crypto.randomUUID(),
-        type: 'text',
-        x: c.x,
-        y: c.y,
-        text: 'Testo',
-        fontSize: 16,
-        boxEnabled: false,
-        boxPadding: 8,
-        width: 150,
-        height: 48,
-        stroke: '#0f172a',
-        fillEnabled: true,
-        fillColor: '#0f172a',
-      },
-    ])
-  }
-
-  const addBubble = () => {
-    const c = getCenter()
-    setObjects(o => [
-      ...o,
-      {
-        id: crypto.randomUUID(),
-        type: 'symbol',
-        symbolType: 'bubble',
-        x: c.x,
-        y: c.y,
-        value: nextBubbleNumber,
-        stroke: '#0f172a',
-        fillEnabled: true,
-        fillColor: '#fde047',
-      },
-    ])
-    setNextBubbleNumber(n => n + 1)
-  }
-
-  const addIPE = () => {
-    const c = getCenter()
-    setObjects(o => [
-      ...o,
-      {
-        id: crypto.randomUUID(),
-        type: 'profile',
-        profileType: 'IPE',
-        profileName: 'IPE 200',
-        x: c.x,
-        y: c.y,
-        scale: 1,
-        viewType: 'front',
-        length: 400,
-        stroke: '#0f172a',
-        fillEnabled: true,
-        fillColor: '#94a3b8',
-      },
-    ])
-  }
-
-  const startPolyline = () => {
-    setDrawingPolyline([])
-    setIsArrowMode(false)
-    setIsBoltMode(false)
-    setIsLineMode(false)
-    setIsFreehandMode(false)
-    setIsQuoteMode(false)
-    setIsMeasureMode(false)
-  }
+  const has = !!p.selected
 
   return (
-    <div className="toolbar">
-      <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.03)', padding: '4px', borderRadius: '10px' }}>
-        <button className={undefined} onClick={addRect} title="Rettangolo">
-          <Square size={20} />
-        </button>
-        <button className={undefined} onClick={addCircle} title="Cerchio">
-          <Circle size={20} />
-        </button>
-        <button
-          className={drawingPolyline ? 'active' : ''}
-          onClick={startPolyline}
-          title="Polyline"
-        >
-          <Activity size={20} />
-        </button>
-        <button
-          className={isLineMode ? 'active' : ''}
-          title="Linea"
-          onClick={() => {
-            setIsLineMode(!isLineMode)
-            setIsFreehandMode(false)
-            setIsArrowMode(false)
-            setIsBoltMode(false)
-            setIsQuoteMode(false)
-            setIsMeasureMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <Minus size={20} />
-        </button>
-        <button
-          className={isFreehandMode ? 'active' : ''}
-          title="Mano Libera"
-          onClick={() => {
-            setIsFreehandMode(!isFreehandMode)
-            setIsLineMode(false)
-            setIsArrowMode(false)
-            setIsBoltMode(false)
-            setIsQuoteMode(false)
-            setIsMeasureMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <PenTool size={20} />
-        </button>
-        <button
-          className={isArrowMode ? 'active' : ''}
-          title="Freccia"
-          onClick={() => {
-            setIsArrowMode(!isArrowMode)
-            setIsBoltMode(false)
-            setIsLineMode(false)
-            setIsFreehandMode(false)
-            setIsQuoteMode(false)
-            setIsMeasureMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <ArrowUpRight size={20} />
-        </button>
-        <button
-          className={isBoltMode ? 'active' : ''}
-          title="Bulloni"
-          onClick={() => {
-            setIsBoltMode(!isBoltMode)
-            setIsArrowMode(false)
-            setIsLineMode(false)
-            setIsFreehandMode(false)
-            setIsQuoteMode(false)
-            setIsMeasureMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <CircleDot size={20} />
-        </button>
-        <button
-          className={isQuoteMode ? 'active' : ''}
-          title="Quota"
-          onClick={() => {
-            setIsQuoteMode(!isQuoteMode)
-            setIsMeasureMode(false)
-            setIsBoltMode(false)
-            setIsArrowMode(false)
-            setIsLineMode(false)
-            setIsFreehandMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <ArrowLeftRight size={20} />
-        </button>
-        <button
-          className={isMeasureMode ? 'active' : ''}
-          title="Misura (Dimensione)"
-          onClick={() => {
-            setIsMeasureMode(!isMeasureMode)
-            setIsQuoteMode(false)
-            setIsBoltMode(false)
-            setIsArrowMode(false)
-            setIsLineMode(false)
-            setIsFreehandMode(false)
-            setDrawingPolyline(null)
-          }}
-        >
-          <Ruler size={20} />
-        </button>
+    <header className="toolbar">
+      <div className="tb-group">
+        <span className="tb-brand">Parametric Canvas</span>
+        <Btn title="Nuovo disegno" onClick={p.onNew}><FilePlus2 size={18} /></Btn>
+        <Btn title="Apri… (Ctrl+O)" onClick={p.onOpen}><FolderOpen size={18} /></Btn>
+        <Btn title="Salva (Ctrl+S)" onClick={p.onSave}><Save size={18} /></Btn>
+        <Sep />
+        <Btn title="Annulla (Ctrl+Z)" onClick={p.onUndo} disabled={!p.canUndo}><Undo2 size={18} /></Btn>
+        <Btn title="Ripeti (Ctrl+Y)" onClick={p.onRedo} disabled={!p.canRedo}><Redo2 size={18} /></Btn>
+        <Sep />
+        <Btn title="Incolla dagli appunti (Ctrl+V)" onClick={p.onPaste}><ClipboardPaste size={18} /></Btn>
       </div>
 
-      <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: '0 8px' }} />
-
-      <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.03)', padding: '4px', borderRadius: '10px' }}>
-        <button className={undefined} onClick={addText} title="Testo">
-          <Type size={20} />
-        </button>
-        <button className={undefined} onClick={addBubble} title="Bollino">
-          <Hash size={20} />
-        </button>
-        <button className={undefined} onClick={addIPE} title="Profilo IPE">
-          <Zap size={20} />
-        </button>
+      <div className="tb-group tb-center">
+        {toolBtn('select')}
+        <Sep />
+        {toolBtn('freehand')}
+        {toolBtn('line')}
+        {toolBtn('polyline')}
+        {toolBtn('arrow')}
+        {toolBtn('rect')}
+        {toolBtn('circle')}
+        {toolBtn('text')}
+        <Sep />
+        <Btn title="Profilo in acciaio (catalogo nel pannello)" onClick={() => p.onAdd('profile')}><Zap size={18} /></Btn>
+        {toolBtn('bolt')}
+        {toolBtn('quote')}
+        <Btn title="Bollino numerato (N)" onClick={() => p.onAdd('bubble')}><Hash size={18} /></Btn>
+        {toolBtn('measure')}
+        <Sep />
+        {toolBtn('scale')}
+        {toolBtn('wand')}
+        {toolBtn('crop')}
       </div>
 
-      {selectedId && (
-        <>
-          <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', margin: '0 8px' }} />
-          <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.03)', padding: '4px', borderRadius: '10px' }}>
-            <button onClick={bringToFront} title="Porta in primo piano">
-              <ChevronsUp size={20} />
-            </button>
-            <button onClick={bringForward} title="Porta avanti">
-              <ChevronUp size={20} />
-            </button>
-            <button onClick={sendBackward} title="Manda indietro">
-              <ChevronDown size={20} />
-            </button>
-            <button onClick={sendToBack} title="Manda in fondo">
-              <ChevronsDown size={20} />
-            </button>
-          </div>
-        </>
-      )}
-
-      <div style={{ flex: 1 }} />
-
-      <button
-        onClick={() => {
-          const svg = document.querySelector('.canvas') as SVGSVGElement
-          if (svg) {
-            captureSvgToClipboard(svg, screenshotMode)
-            onScreenshot()
-          }
-        }}
-        style={{
-          background: 'var(--primary)',
-          color: 'white',
-          padding: '8px 16px',
-          borderRadius: '10px',
-          boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-        }}
-      >
-        <Camera size={18} />
-        <span>Screenshot</span>
-      </button>
-    </div>
+      <div className="tb-group">
+        <Btn
+          title={p.selected?.locked ? 'Sblocca (Ctrl+L)' : 'Blocca: non si sposta né si elimina (Ctrl+L)'}
+          onClick={p.onToggleLock} disabled={!has} active={!!p.selected?.locked}
+        >
+          {p.selected?.locked ? <Lock size={18} /> : <LockOpen size={18} />}
+        </Btn>
+        <Btn title="Duplica (Ctrl+D)" onClick={p.onDuplicate} disabled={!has}><Copy size={18} /></Btn>
+        <Btn title="Porta in primo piano (Ctrl+])" onClick={p.onBringToFront} disabled={!has}><ChevronsUp size={18} /></Btn>
+        <Btn title="Manda in fondo (Ctrl+[)" onClick={p.onSendToBack} disabled={!has}><ChevronsDown size={18} /></Btn>
+        <Btn title="Elimina (Canc)" onClick={p.onDelete} disabled={!has || !!p.selected?.locked}><Trash2 size={18} /></Btn>
+        <Sep />
+        <button className="tb-primary" onClick={p.onScreenshot} title="Copia la vista negli appunti come immagine">
+          <Camera size={16} />
+          <span>Screenshot</span>
+        </button>
+        <Btn title={p.panelOpen ? 'Nascondi proprietà' : 'Mostra proprietà'} onClick={p.togglePanel} active={p.panelOpen}>
+          {p.panelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+        </Btn>
+      </div>
+    </header>
   )
 }

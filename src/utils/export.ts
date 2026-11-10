@@ -1,4 +1,4 @@
-import { CanvasObject } from '../types'
+import type { CanvasObject } from '../types'
 import { ALL_PROFILES } from '../profiles'
 import { getBeamPoints, generateBeamPath } from '../beamPath'
 
@@ -93,22 +93,6 @@ SECTION
 2
 ENTITIES
 `
-    const addLine = (x1: number, y1: number, x2: number, y2: number, layer = '0') => {
-        dxf += `0
-LINE
-8
-${layer}
-10
-${x1}
-20
-${-y1}
-11
-${x2}
-21
-${-y2}
-`
-    } // Note: Y inverted for DXF typically
-
     const addPolyline = (pts: { x: number, y: number }[], closed: boolean, layer = '0') => {
         dxf += `0
 LWPOLYLINE
@@ -127,6 +111,7 @@ ${-p.y}
 `
         })
     }
+
 
     objects.forEach(o => {
         if (o.type === 'rect') {

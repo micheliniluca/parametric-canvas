@@ -1,4 +1,4 @@
-import { BoltObject, Point } from '../types'
+import type { BoltObject, Point } from '../types'
 
 export const parseSpacing = (spacing: string): number[] => {
     if (!spacing.trim()) return [0]
@@ -31,7 +31,6 @@ export const getBoltPositions = (bolt: BoltObject): Point[] => {
     const dx = p2.x - p1.x
     const dy = p2.y - p1.y
     const angle = Math.atan2(dy, dx)
-    const length = Math.sqrt(dx * dx + dy * dy) // Current visual length, though logic depends on spacing
 
     // 2. Parse Spacings
     // X spacing defines relative positions along the line

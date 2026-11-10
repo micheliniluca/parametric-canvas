@@ -1,7 +1,30 @@
+import { SERIES_SHAPE } from './profiles'
+import type { ProfileSeries } from './profiles'
+
+const shapeOf = (type: string) => SERIES_SHAPE[type as ProfileSeries] ?? 'I'
+
 export function getBeamPoints(props: { type?: string, h: number, b: number, tw: number, tf: number, r?: number, viewType?: 'front' | 'side' | 'top', length?: number }) {
     const { type = 'IPE', h, b, tw, tf, viewType = 'front', length = 400 } = props
+    const shape = shapeOf(type)
 
-    if (type === 'CHS') {
+    if (viewType === 'front' && shape === 'U') {
+        // canale: anima a sinistra, ali verso destra
+        const x0 = -b / 2, x1 = b / 2, y0 = -h / 2, y1 = h / 2
+        return [
+            { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y0 + tf }, { x: x0 + tw, y: y0 + tf },
+            { x: x0 + tw, y: y1 - tf }, { x: x1, y: y1 - tf }, { x: x1, y: y1 }, { x: x0, y: y1 },
+        ]
+    }
+    if (viewType === 'front' && shape === 'L') {
+        // angolare: spigolo in basso a sinistra
+        const x0 = -b / 2, x1 = b / 2, y0 = -h / 2, y1 = h / 2
+        return [
+            { x: x0, y: y0 }, { x: x0 + tw, y: y0 }, { x: x0 + tw, y: y1 - tf },
+            { x: x1, y: y1 - tf }, { x: x1, y: y1 }, { x: x0, y: y1 },
+        ]
+    }
+
+    if (shape === 'CHS') {
         if (viewType === 'side' || viewType === 'top') {
             return [
                 { x: 0, y: -h / 2 },
@@ -21,7 +44,7 @@ export function getBeamPoints(props: { type?: string, h: number, b: number, tw: 
         return pts
     }
 
-    if (type === 'RHS') {
+    if (shape === 'RHS') {
         if (viewType === 'side' || viewType === 'top') {
             const w = viewType === 'side' ? h : b
             return [
@@ -81,8 +104,35 @@ export function getBeamPoints(props: { type?: string, h: number, b: number, tw: 
 
 export function generateBeamPath(props: { type?: string, h: number, b: number, tw: number, tf: number, r?: number, viewType?: 'front' | 'side' | 'top', length?: number }): { path: string, dashed?: string } {
     const { type = 'IPE', h, b, tw, tf, viewType = 'front', length = 400 } = props
+    const shape = shapeOf(type)
 
-    if (type === 'CHS') {
+    if (shape === 'U' || shape === 'L') {
+        if (viewType === 'side') {
+            // ala inferiore (U) o lato orizzontale (L) visibili come linee
+            const lines = shape === 'U'
+                ? `M 0 ${-h / 2 + tf} L ${length} ${-h / 2 + tf} M 0 ${h / 2 - tf} L ${length} ${h / 2 - tf}`
+                : `M 0 ${h / 2 - tf} L ${length} ${h / 2 - tf}`
+            return { path: `M 0 ${-h / 2} L ${length} ${-h / 2} L ${length} ${h / 2} L 0 ${h / 2} Z ${lines}` }
+        }
+        if (viewType === 'top') {
+            return {
+                path: `M 0 ${-b / 2} L ${length} ${-b / 2} L ${length} ${b / 2} L 0 ${b / 2} Z`,
+                dashed: `M 0 ${-b / 2 + tw} L ${length} ${-b / 2 + tw}`,
+            }
+        }
+        const x0 = -b / 2, x1 = b / 2, y0 = -h / 2, y1 = h / 2
+        const r = Math.max(0, Math.min(props.r ?? 0, (b - tw) * 0.8, (h - 2 * tf) / 2))
+        if (shape === 'U') {
+            return {
+                path: `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y0 + tf} L ${x0 + tw + r} ${y0 + tf} A ${r} ${r} 0 0 0 ${x0 + tw} ${y0 + tf + r} L ${x0 + tw} ${y1 - tf - r} A ${r} ${r} 0 0 0 ${x0 + tw + r} ${y1 - tf} L ${x1} ${y1 - tf} L ${x1} ${y1} L ${x0} ${y1} Z`,
+            }
+        }
+        return {
+            path: `M ${x0} ${y0} L ${x0 + tw} ${y0} L ${x0 + tw} ${y1 - tf - r} A ${r} ${r} 0 0 0 ${x0 + tw + r} ${y1 - tf} L ${x1} ${y1 - tf} L ${x1} ${y1} L ${x0} ${y1} Z`,
+        }
+    }
+
+    if (shape === 'CHS') {
         if (viewType === 'side' || viewType === 'top') {
             const rOuter = h / 2
             const rInner = h / 2 - tw
@@ -98,7 +148,7 @@ export function generateBeamPath(props: { type?: string, h: number, b: number, t
         }
     }
 
-    if (type === 'RHS') {
+    if (shape === 'RHS') {
         if (viewType === 'side') {
             const yTop = -h / 2
             const yBot = h / 2
@@ -169,7 +219,7 @@ export function generateBeamPath(props: { type?: string, h: number, b: number, t
     // IPE/HEA/HEB front view
     const yTop = -h / 2
     const yBot = h / 2
-    const fillR = props.r ?? Math.max(tw, tf) * 1.2
+    const fillR = Math.min(props.r ?? Math.max(tw, tf) * 1.2, (b - tw) / 2)
 
     if (fillR <= 0) {
         const pts = getBeamPoints(props)

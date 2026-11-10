@@ -1,3 +1,5 @@
+import type { ProfileSeries } from './profiles'
+
 export type BaseObject = {
   id: string
   type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline'
@@ -49,7 +51,7 @@ export type TextObject = BaseObject & {
 
 export type ProfileObject = BaseObject & {
   type: 'profile'
-  profileType: 'IPE' | 'HEA' | 'HEB' | 'RHS' | 'CHS'
+  profileType: ProfileSeries
   profileName: string
   scale: number
   viewType: 'front' | 'side' | 'top'
@@ -87,17 +89,25 @@ export type ArrowObject = BaseObject & {
   y2: number
 }
 
+export type BoltView = 'head' | 'nut' | 'hole' | 'section'
+export type BoltGrade = '4.6' | '5.6' | '6.8' | '8.8' | '10.9'
+
+/**
+ * Bullone (o gruppo di bulloni uguali disposti a griglia).
+ * x, y = centro del primo bullone; in sezione = asse sulla faccia superiore del pacco.
+ */
 export type BoltObject = BaseObject & {
   type: 'bolt'
-  p1: Point
-  p2: Point
   diameter: number
-  spacingX: string // Tekla style: "100 2*80"
-  spacingY: string
-  offsetX: number // Shift from start along X
-  offsetY: number // Shift from axis along Y
-  viewType: 'top' | 'side'
-  length: number
+  grade: BoltGrade
+  view: BoltView
+  /** Spessore del pacco serrato (mm), usato in sezione e per la lunghezza */
+  grip: number
+  cols: number
+  pitchX: number
+  rows: number
+  pitchY: number
+  showLabel?: boolean
 }
 
 export type SymbolType = 'bubble'

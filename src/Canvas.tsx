@@ -260,9 +260,18 @@ export function Canvas({
         setEditingId(id)
         return
       }
+      case 'bolt': {
+        // un clic = un bullone (snap su vertici/punti medi)
+        const p = pick(e)
+        addObject({
+          id: crypto.randomUUID(), type: 'bolt', x: p.x, y: p.y,
+          diameter: 20, grade: '8.8', view: 'head', grip: 20,
+          cols: 1, pitchX: 70, rows: 1, pitchY: 70, stroke: drawStyle.stroke, strokeWidth: 1,
+        })
+        return
+      }
       case 'line':
       case 'arrow':
-      case 'bolt':
       case 'rect':
       case 'circle': {
         const p = pick(e)
@@ -469,10 +478,6 @@ export function Canvas({
             const p = pick(e, other, a.id)
             return a.end === 'p1' ? { ...o, x1: p.x, y1: p.y } : { ...o, x2: p.x, y2: p.y }
           }
-          if (o.type === 'bolt') {
-            const p = pick(e, a.end === 'p1' ? o.p2 : o.p1, a.id)
-            return a.end === 'p1' ? { ...o, p1: p, x: p.x, y: p.y } : { ...o, p2: p }
-          }
           return o
         })
         return
@@ -519,12 +524,6 @@ export function Canvas({
         addObject({
           id: crypto.randomUUID(), type: 'arrow', x: 0, y: 0,
           x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, ...strokeProps(),
-        })
-      } else if (tool === 'bolt') {
-        addObject({
-          id: crypto.randomUUID(), type: 'bolt', x: p1.x, y: p1.y, p1, p2,
-          diameter: 16, spacingX: '100', spacingY: '50', offsetX: 0, offsetY: 0,
-          viewType: 'top', length: 60, stroke: drawStyle.stroke,
         })
       }
     }

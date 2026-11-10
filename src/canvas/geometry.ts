@@ -1,7 +1,7 @@
 import type { CanvasObject, Point } from '../types'
-import { ALL_PROFILES } from '../profiles'
+import { findProfile } from '../profiles'
 import { getBeamPoints } from '../beamPath'
-import { getBoltPositions } from '../utils/boltUtils'
+import { boltBounds, boltCenters } from '../utils/boltUtils'
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -58,14 +58,10 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
     case 'arrow':
     case 'quote':
       return fromPoints([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }])
-    case 'bolt': {
-      const pts = [o.p1, o.p2, ...getBoltPositions(o)]
-      const b = fromPoints(pts)
-      const r = o.diameter
-      return { x: b.x - r, y: b.y - r, w: b.w + r * 2, h: b.h + r * 2 }
-    }
+    case 'bolt':
+      return boltBounds(o)
     case 'profile': {
-      const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+      const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
       const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
       return fromPoints(pts.map(p => ({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale })))
@@ -80,7 +76,6 @@ export const getObjectCenter = (o: CanvasObject): Point => {
     return { x: o.x + (o.length / 2) * o.scale, y: o.y }
   }
   if (o.type === 'arrow' || o.type === 'quote') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
-  if (o.type === 'bolt') return { x: (o.p1.x + o.p2.x) / 2, y: (o.p1.y + o.p2.y) / 2 }
   const b = getObjectBounds(o)
   return { x: b.x + b.w / 2, y: b.y + b.h / 2 }
 }
@@ -94,8 +89,6 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     case 'arrow':
     case 'quote':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
-    case 'bolt':
-      return { ...o, x: o.x + dx, y: o.y + dy, p1: mv(o.p1), p2: mv(o.p2) }
     default:
       return { ...o, x: o.x + dx, y: o.y + dy }
   }
@@ -105,7 +98,6 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
 export const refPointOf = (o: CanvasObject): Point => {
   if (o.type === 'polyline') return o.points[0] ?? { x: 0, y: 0 }
   if (o.type === 'arrow' || o.type === 'quote') return { x: o.x1, y: o.y1 }
-  if (o.type === 'bolt') return o.p1
   return { x: o.x, y: o.y }
 }
 
@@ -141,7 +133,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
       return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
     }
     case 'bolt':
-      return { ...obj, p1: sp(obj.p1), p2: sp(obj.p2), diameter: obj.diameter * sf }
+      // il diametro resta quello normalizzato: si scalano posizione e passi
+      return { ...obj, ...sp(obj), pitchX: obj.pitchX * sf, pitchY: obj.pitchY * sf }
     case 'symbol':
       return { ...obj, ...sp(obj), points: obj.points?.map(sp) }
   }
@@ -199,7 +192,7 @@ export const getSnapPoint = (
     } else if (o.type === 'circle' || o.type === 'symbol') {
       candidates.push({ x: o.x, y: o.y })
     } else if (o.type === 'profile') {
-      const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+      const profile = findProfile(o.profileName)
       if (profile) {
         const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
         addRing(pts.map(p => r({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale })), true)
@@ -207,7 +200,7 @@ export const getSnapPoint = (
     } else if (o.type === 'polyline') {
       addRing(o.points.map(r), o.closed && o.points.length > 2)
     } else if (o.type === 'bolt') {
-      candidates.push(...getBoltPositions(o).map(r))
+      candidates.push(...boltCenters(o).map(r))
     } else if (o.type === 'arrow' || o.type === 'quote') {
       addRing([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }].map(r), false)
     }

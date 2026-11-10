@@ -1,5 +1,5 @@
 import type { CanvasObject } from '../types'
-import { ALL_PROFILES } from '../profiles'
+import { findProfile } from '../profiles'
 import { getBeamPoints, generateBeamPath } from '../beamPath'
 
 /* =========================================
@@ -62,7 +62,7 @@ export function exportToSVG(objects: CanvasObject[]): string {
                 svg += `  <polyline points="${ptr}" stroke="${stroke}" fill="${fill}" stroke-width="${o.strokeWidth || 2}" />\n`
             }
         } else if (o.type === 'profile') {
-            const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+            const profile = findProfile(o.profileName)
             if (profile) {
                 const { path: d } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
                 svg += `  <g transform="translate(${o.x}, ${o.y}) scale(${o.scale})"><path d="${d}" stroke="${stroke}" fill="${fill}" vector-effect="non-scaling-stroke" /></g>\n`
@@ -125,7 +125,7 @@ ${-p.y}
         } else if (o.type === 'polyline') {
             addPolyline(o.points, o.closed) // Assuming closed property exists or handled
         } else if (o.type === 'profile') {
-            const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+            const profile = findProfile(o.profileName)
             if (profile) {
                 const rawPts = getBeamPoints(profile)
                 const s = o.scale
@@ -242,7 +242,7 @@ export function exportToSTL(objects: CanvasObject[]): string {
             const tris = [[0, 1, 2], [0, 2, 3]]
             stl += extrudePolygon(pts, 10, tris) // Default 10 extrusion
         } else if (o.type === 'profile') {
-            const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+            const profile = findProfile(o.profileName)
             if (profile) {
                 const rawPts = getBeamPoints(profile)
                 const s = o.scale

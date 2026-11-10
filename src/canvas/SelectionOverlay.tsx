@@ -39,7 +39,7 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
   )
 
   const locked = !!o.locked
-  const isEndpointType = o.type === 'arrow' || o.type === 'quote' || o.type === 'bolt'
+  const isEndpointType = o.type === 'arrow' || o.type === 'quote'
   const showVertices = !locked && o.type === 'polyline' && o.points.length <= MAX_VERTEX_GRIPS
   const showBox = locked || (!isEndpointType && !showVertices)
   const b = getObjectBounds(o)
@@ -53,6 +53,7 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
   const parts: string[] = []
   if (o.type === 'rect' || o.type === 'image') parts.push(`${round1(o.width)} × ${round1(o.height)}`)
   else if (o.type === 'circle') parts.push(`Ø ${round1(o.radius * 2)}`)
+  else if (o.type === 'bolt') parts.push(`M${o.diameter}${o.cols * (o.view === 'section' ? 1 : o.rows) > 1 ? ` · ${o.cols}×${o.view === 'section' ? 1 : o.rows}` : ''}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)
   const label = parts.join('  ·  ')
@@ -100,12 +101,6 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
           <>
             {grip('p1', o.x1, o.y1, { kind: 'end', end: 'p1' }, 'move')}
             {grip('p2', o.x2, o.y2, { kind: 'end', end: 'p2' }, 'move')}
-          </>
-        )}
-        {!locked && o.type === 'bolt' && (
-          <>
-            {grip('p1', o.p1.x, o.p1.y, { kind: 'end', end: 'p1' }, 'move')}
-            {grip('p2', o.p2.x, o.p2.y, { kind: 'end', end: 'p2' }, 'move')}
           </>
         )}
       </g>

@@ -1,8 +1,8 @@
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { CanvasObject } from '../types'
-import { ALL_PROFILES } from '../profiles'
+import { findProfile } from '../profiles'
 import { generateBeamPath } from '../beamPath'
-import { getBoltPositions, getBoltHeadPath, getBoltSideShapes } from '../utils/boltUtils'
+import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUtils'
 import { dashArray } from '../style'
 import { getObjectCenter, textSize } from './geometry'
 
@@ -183,30 +183,22 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
     }
 
     case 'bolt': {
-      const color = o.stroke || '#0f172a'
-      const points = getBoltPositions(o)
-      const headPath = getBoltHeadPath(o.diameter)
-      const sideShapes = o.viewType === 'side' ? getBoltSideShapes(o.diameter, o.length) : []
-      const axisDeg = (Math.atan2(o.p2.y - o.p1.y, o.p2.x - o.p1.x) * 180) / Math.PI + 90
+      const sw = o.strokeWidth ?? 1
+      const parts = boltCenters(o).map(c => boltDrawing(o, c))
+      const b = boltBounds(o)
       return (
-        <g transform={transform}>
-          <line x1={o.p1.x} y1={o.p1.y} x2={o.p2.x} y2={o.p2.y}
-            stroke="#94a3b8" strokeWidth={1} strokeDasharray="5,5" pointerEvents="none" />
-          {points.map((p, i) =>
-            o.viewType === 'side' ? (
-              <g key={i} transform={`translate(${p.x}, ${p.y}) rotate(${axisDeg})`} pointerEvents="none">
-                {sideShapes.map((s, si) => <path key={si} d={s.d} fill="none" stroke={color} strokeWidth={1} />)}
-              </g>
-            ) : (
-              <g key={i} transform={`translate(${p.x}, ${p.y})`} pointerEvents="none">
-                <path d={headPath} fill="none" stroke={color} strokeWidth={1} />
-                <line x1={-o.diameter / 5} y1={0} x2={o.diameter / 5} y2={0} stroke={color} strokeWidth={0.5} />
-                <line x1={0} y1={-o.diameter / 5} x2={0} y2={o.diameter / 5} stroke={color} strokeWidth={0.5} />
-              </g>
-            ),
+        <g transform={transform} onMouseDown={down} pointerEvents={pe}>
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
+          <path d={parts.map(p => p.axis).join('')} fill="none" stroke={stroke} strokeOpacity={0.6}
+            strokeWidth={sw * 0.35} strokeDasharray={`${sw * 6} ${sw * 1.5} ${sw * 1} ${sw * 1.5}`} pointerEvents="none" />
+          <path d={parts.map(p => p.outline).join('')} fill={o.fillEnabled ? o.fillColor || 'white' : 'none'}
+            fillRule="evenodd" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" pointerEvents="none" />
+          <path d={parts.map(p => p.thin).join('')} fill="none" stroke={stroke} strokeWidth={sw * 0.5} pointerEvents="none" />
+          {o.showLabel && (
+            <text x={b.x + b.w + 6} y={b.y - 4} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+              {boltLabel(o)}
+            </text>
           )}
-          <line x1={o.p1.x} y1={o.p1.y} x2={o.p2.x} y2={o.p2.y} stroke="transparent" strokeWidth={20}
-            pointerEvents={interactive ? 'stroke' : 'none'} onMouseDown={down} />
         </g>
       )
     }
@@ -229,7 +221,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
       )
 
     case 'profile': {
-      const profile = ALL_PROFILES.find(p => p.name === o.profileName)
+      const profile = findProfile(o.profileName)
       if (!profile) return null
       const s = o.scale
       const sw = o.strokeWidth ?? 1.5

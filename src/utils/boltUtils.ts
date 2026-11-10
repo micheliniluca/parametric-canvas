@@ -1,213 +1,207 @@
-import type { BoltObject, Point } from '../types'
+import type { BoltObject, CanvasObject, Point } from '../types'
 
-export const parseSpacing = (spacing: string): number[] => {
-    if (!spacing.trim()) return [0]
+/**
+ * Dimensioni normalizzate (mm):
+ * s = apertura chiave, k = altezza testa (ISO 4014), m = altezza dado (ISO 4032),
+ * dw / hw = diametro e spessore rondella (ISO 7089), d0 = foro normale (EN 1090-2), p = passo filetto.
+ */
+export type BoltDims = { d: number; s: number; k: number; m: number; dw: number; hw: number; d0: number; p: number }
 
-    const parts = spacing.trim().split(/\s+/)
-    const offsets: number[] = []
-
-    parts.forEach(part => {
-        if (part.includes('*')) {
-            const [countStr, valStr] = part.split('*')
-            const count = parseInt(countStr)
-            const val = parseFloat(valStr)
-            if (!isNaN(count) && !isNaN(val)) {
-                for (let i = 0; i < count; i++) offsets.push(val)
-            }
-        } else {
-            const val = parseFloat(part)
-            if (!isNaN(val)) offsets.push(val)
-        }
-    })
-
-    if (offsets.length === 0) return [0]
-    return offsets
+const TABLE: Record<number, Omit<BoltDims, 'd'>> = {
+  12: { s: 18, k: 7.5, m: 10.8, dw: 24, hw: 2.5, d0: 13, p: 1.75 },
+  14: { s: 21, k: 8.8, m: 12.8, dw: 28, hw: 2.5, d0: 15, p: 2 },
+  16: { s: 24, k: 10, m: 14.8, dw: 30, hw: 3, d0: 18, p: 2 },
+  20: { s: 30, k: 12.5, m: 18, dw: 37, hw: 3, d0: 22, p: 2.5 },
+  22: { s: 34, k: 14, m: 19.4, dw: 39, hw: 3, d0: 24, p: 2.5 },
+  24: { s: 36, k: 15, m: 21.5, dw: 44, hw: 4, d0: 26, p: 3 },
+  27: { s: 41, k: 17, m: 23.8, dw: 50, hw: 4, d0: 30, p: 3 },
+  30: { s: 46, k: 18.7, m: 25.6, dw: 56, hw: 4, d0: 33, p: 3.5 },
+  36: { s: 55, k: 22.5, m: 31, dw: 66, hw: 5, d0: 39, p: 4 },
 }
 
-export const getBoltPositions = (bolt: BoltObject): Point[] => {
-    const { p1, p2, spacingX, spacingY, offsetX, offsetY } = bolt
+export const BOLT_DIAMETERS = Object.keys(TABLE).map(Number)
+export const BOLT_GRADES = ['4.6', '5.6', '6.8', '8.8', '10.9'] as const
 
-    // 1. Calculate direction and angle
-    const dx = p2.x - p1.x
-    const dy = p2.y - p1.y
-    const angle = Math.atan2(dy, dx)
-
-    // 2. Parse Spacings
-    // X spacing defines relative positions along the line
-    // e.g. "100 80" means: first bolt at 100, second at 100+80
-    const xOffsetsRaw = parseSpacing(spacingX)
-    const xPositions: number[] = []
-
-    // Accumulate X offsets
-    let currentX = offsetX
-    // Note: Tekla logic varies. Usually specific values are absolute or relative.
-    // "100 2*80" usually means:
-    // Bolt 1 at 0? No, usually Start Point is origin.
-    // In Tekla: Spacing "100 80" creates bolts at distances from start.
-    // Let's assume the string defines the GAPS.
-    // Bolt 1 is usually at Start + Offset.
-    // Bolt 2 is at Bolt 1 + 100.
-    // Bolt 3 is at Bolt 2 + 80.
-
-    // Actually, let's treat it as: First bolt at `offsetX`.
-    // Then subsequent bolts at `offsetX + spacing[i]`.
-    // Wait, "100 2*80" means gaps of 100, 80, 80.
-    // So:
-    // B1: offsetX
-    // B2: offsetX + 100
-    // B3: offsetX + 100 + 80
-    // B4: offsetX + 100 + 80 + 80
-
-    xPositions.push(currentX) // First bolt at origin + offset
-    xOffsetsRaw.forEach(gap => {
-        currentX += gap
-        xPositions.push(currentX)
-    })
-    // If string was empty/zero, we just have one bolt at offsetX.
-
-    // Y Spacing
-    // "50 50" -> Centers? Or from centerline?
-    // Usually symmetric or specified.
-    // Let's assume spacingY string defines GAPS between rows, centered around axis?
-    // Or just offsets from axis?
-    // Let's implement simple: "0" is on axis. "50" means one row at 50?
-    // Let's mimic Tekla: Spacing Y is distance list.
-    // If we have "80", is it two bolts at +/- 40? Or just one at 80?
-    // Tekla "Bolt dist Y" usually implies pattern.
-    // Let's simplify: Spacing Y is visual list of offsets from centerline.
-    // e.g. "0" -> one row on line.
-    // "-40 40" -> two rows.
-    // "80" -> Maybe treated as one gap, implying two bolts?
-    // Let's stick to explicit offsets list logic for Y too, but centered?
-    // No, let's stick to the same logic: gaps.
-    // But where does it start?
-    // Let's just say spacingY are ABSOLUTE offsets from centerline for now to be flexible?
-    // Or gaps starting from -width/2?
-    // Let's try: SpacingY defines gaps between bolts in Y direction.
-    // We center the whole group in Y.
-
-    const yGaps = parseSpacing(spacingY)
-    // Calculate total width to center
-    const totalY = yGaps.reduce((a, b) => a + b, 0)
-    let startY = -totalY / 2
-
-    const yPositions: number[] = [startY + offsetY]
-    let currentY = startY + offsetY
-    yGaps.forEach(gap => {
-        currentY += gap
-        yPositions.push(currentY)
-    })
-
-    // 3. Generate Grid Points
-    const points: Point[] = []
-
-    xPositions.forEach(lx => {
-        yPositions.forEach(ly => {
-            // Rotate coordinates
-            // Global X = p1.x + lx * cos - ly * sin
-            // Global Y = p1.y + lx * sin + ly * cos
-
-            const gx = p1.x + lx * Math.cos(angle) - ly * Math.sin(angle)
-            const gy = p1.y + lx * Math.sin(angle) + ly * Math.cos(angle)
-
-            points.push({ x: gx, y: gy })
-        })
-    })
-
-    return points
+export const boltDims = (d: number): BoltDims => {
+  const row = TABLE[d]
+  if (row) return { d, ...row }
+  // diametri fuori tabella: proporzioni approssimate
+  return { d, s: d * 1.5, k: d * 0.62, m: d * 0.85, dw: d * 1.85, hw: d * 0.15, d0: d + 2, p: d * 0.125 }
 }
 
-export const getBoltHeadPath = (diameter: number): string => {
-    // Hexagon width across flats (W) is roughly 1.6 * d
-    // Standard M12 -> 19mm (~1.58)
-    // M16 -> 24mm (1.5)
-    // M20 -> 30mm (1.5)
-    // M24 -> 36mm (1.5)
-    // M30 -> 46mm (1.53) - user request 45, standard is 46. Let's use ~1.55 multiplier or lookup.
+/** Lunghezza commerciale: pacco + 2 rondelle + dado + sporgenza di almeno 2 passi, arrotondata a 5 mm */
+export const boltLength = (o: Pick<BoltObject, 'diameter' | 'grip'>): number => {
+  const t = boltDims(o.diameter)
+  return Math.ceil((o.grip + 2 * t.hw + t.m + 2 * t.p) / 5) * 5
+}
 
-    // Lookup table for standard metric bolts (ISO 4014)
-    const hexSizes: Record<number, number> = {
-        12: 19,
-        14: 22,
-        16: 24,
-        20: 30,
-        22: 32,
-        24: 36,
-        27: 41,
-        30: 46, // User mentioned 45, but 46 is standard. Let's use 46 or map 30->45 if strictly requested.
-        36: 55
+export const boltLabel = (o: BoltObject): string => {
+  const n = o.view === 'section' ? Math.max(1, o.cols) : Math.max(1, o.cols) * Math.max(1, o.rows)
+  return `${n > 1 ? `${n} ` : ''}M${o.diameter}×${boltLength(o)} cl. ${o.grade}`
+}
+
+/** Centri dei bulloni (in sezione solo la fila lungo X) */
+export const boltCenters = (o: BoltObject): Point[] => {
+  const cols = Math.max(1, Math.round(o.cols))
+  const rows = o.view === 'section' ? 1 : Math.max(1, Math.round(o.rows))
+  const pts: Point[] = []
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) pts.push({ x: o.x + i * o.pitchX, y: o.y + j * o.pitchY })
+  return pts
+}
+
+/** Ingombro non ruotato */
+export const boltBounds = (o: BoltObject) => {
+  const t = boltDims(o.diameter)
+  const centers = boltCenters(o)
+  const xs = centers.map(c => c.x)
+  const ys = centers.map(c => c.y)
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+  if (o.view === 'section') {
+    const e = t.s * 1.1547
+    const half = Math.max(e, t.dw) / 2
+    const top = -(t.k + t.hw)
+    const bottom = o.grip + t.hw + t.m + 2 * t.p
+    return { x: minX - half, y: minY + top, w: maxX - minX + half * 2, h: bottom - top }
+  }
+  const r = o.view === 'hole' ? t.d0 / 2 + t.d * 0.4 : Math.max(t.dw, t.s * 1.1547) / 2
+  return { x: minX - r, y: minY - r, w: maxX - minX + 2 * r, h: maxY - minY + 2 * r }
+}
+
+/** Esagono con apertura chiave s, lati piani in alto e in basso */
+export const hexPath = (cx: number, cy: number, s: number): string => {
+  const R = s / Math.sqrt(3)
+  let d = ''
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    d += `${i ? 'L' : 'M'} ${cx + R * Math.cos(a)} ${cy + R * Math.sin(a)} `
+  }
+  return d + 'Z'
+}
+
+export type BoltDrawing = {
+  /** contorni visibili */
+  outline: string
+  /** linee sottili (filetto, spigoli) */
+  thin: string
+  /** assi (tratto-punto) */
+  axis: string
+}
+
+/** Geometria di un singolo bullone centrato in (cx, cy) secondo la vista */
+export const boltDrawing = (o: BoltObject, c: Point): BoltDrawing => {
+  const t = boltDims(o.diameter)
+  const circle = (r: number) => `M ${c.x - r} ${c.y} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0 `
+  const cross = (r: number) => `M ${c.x - r} ${c.y} L ${c.x + r} ${c.y} M ${c.x} ${c.y - r} L ${c.x} ${c.y + r} `
+
+  switch (o.view) {
+    case 'head':
+      return { outline: hexPath(c.x, c.y, t.s) + circle(t.dw / 2), thin: circle(t.s * 0.95 / 2), axis: cross(t.dw / 2 + 3) }
+    case 'nut': {
+      // estremità filettata: diametro nominale pieno, nocciolo con arco di 3/4 (ISO 6410)
+      const rr = (t.d * 0.85) / 2
+      const arc = `M ${c.x + rr} ${c.y} A ${rr} ${rr} 0 1 1 ${c.x} ${c.y - rr} `
+      return { outline: hexPath(c.x, c.y, t.s) + circle(t.dw / 2) + circle(t.d / 2), thin: arc, axis: cross(t.dw / 2 + 3) }
     }
-
-    const W = hexSizes[diameter] || (diameter * 1.6)
-    const R = W / Math.sqrt(3) // Radius of circumcircle (center to corner)
-
-    // Generate 6 points
-    // Point 0 is usually at angle 0 or 30?
-    // Pointy top? or Flat top?
-    // Bolt heads in drawings usually have flat top/bottom or pointy.
-    // Let's do pointy top (angle 30 offset) to look like a standard hex nut orientation
-
-    // Angles: 0, 60, 120, 180, 240, 300 -> Flat sides on left/right
-    // Angles: 30, 90, 150, 210, 270, 330 -> Pointy top/bottom, flat sides on left/right? No.
-    // 0 deg is typically Right.
-    // Let's generate points: x = R * cos(a), y = R * sin(a)
-
-    let d = ""
-    for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i // 0, 60, 120...
-        const x = R * Math.cos(angle)
-        const y = R * Math.sin(angle)
-        d += (i === 0 ? "M " : "L ") + `${x} ${y} `
+    case 'hole':
+      return { outline: circle(t.d0 / 2), thin: '', axis: cross(t.d0 / 2 + t.d * 0.4) }
+    case 'section': {
+      // asse verticale; y = 0 sulla faccia superiore del pacco, testa sopra, dado sotto
+      const e = t.s * 1.1547
+      const x = c.x
+      const y = c.y
+      const rect = (w: number, y0: number, h: number) => `M ${x - w / 2} ${y0} h ${w} v ${h} h ${-w} Z `
+      const yHead = y - t.hw - t.k
+      const yNutW = y + o.grip
+      const yNut = yNutW + t.hw
+      const yEnd = yNut + t.m + 2 * t.p
+      const outline =
+        rect(e, yHead, t.k) + // testa (vista sugli spigoli)
+        rect(t.dw, y - t.hw, t.hw) + // rondella sotto testa
+        `M ${x - t.d / 2} ${y} V ${yNutW} M ${x + t.d / 2} ${y} V ${yNutW} ` + // gambo nel pacco
+        rect(t.dw, yNutW, t.hw) + // rondella lato dado
+        rect(e, yNut, t.m) + // dado
+        `M ${x - t.d / 2} ${yNut + t.m} V ${yEnd - t.p * 0.5} L ${x - t.d / 2 + t.p * 0.5} ${yEnd} H ${x + t.d / 2 - t.p * 0.5} L ${x + t.d / 2} ${yEnd - t.p * 0.5} V ${yNut + t.m} ` // sporgenza con smusso
+      const rr = (t.d * 0.85) / 2
+      const thin =
+        `M ${x - e / 4} ${yHead} V ${yHead + t.k} M ${x + e / 4} ${yHead} V ${yHead + t.k} ` + // spigoli testa
+        `M ${x - e / 4} ${yNut} V ${yNut + t.m} M ${x + e / 4} ${yNut} V ${yNut + t.m} ` + // spigoli dado
+        `M ${x - rr} ${yNut + t.m} V ${yEnd} M ${x + rr} ${yNut + t.m} V ${yEnd} ` // nocciolo filetto
+      const axis = `M ${x} ${yHead - 4} V ${yEnd + 4} `
+      return { outline, thin, axis }
     }
-    d += "Z"
-    return d
+  }
 }
 
-export type BoltShape = {
-    d: string
-    fill?: string
-    stroke?: string
-    strokeWidth?: number
+/* ======================================================
+   Migrazione dei disegni con la vecchia "bullonatura" (asse p1→p2 + interassi stile Tekla)
+   ====================================================== */
+
+type LegacyBolt = {
+  id: string; type: 'bolt'; p1: Point; p2: Point; diameter: number
+  spacingX: string; spacingY: string; offsetX: number; offsetY: number
+  viewType?: 'top' | 'side'; length?: number; stroke?: string
 }
 
-export const getBoltSideShapes = (diameter: number, length: number): BoltShape[] => {
-    // Standard bolt head height k ~ 0.65 * d
-    // Nut height m ~ 0.8 * d
-    // Washer thickness h ~ 0.15 * d
-    const k = diameter * 0.7
-    const m = diameter * 0.8
-    const h = diameter * 0.15
-    const headWidth = diameter * 1.6 // Approximately
+const parseSpacing = (spacing: string): number[] => {
+  const out: number[] = []
+  for (const part of (spacing || '').trim().split(/\s+/)) {
+    if (!part) continue
+    if (part.includes('*')) {
+      const [n, v] = part.split('*')
+      for (let i = 0; i < parseInt(n); i++) out.push(parseFloat(v))
+    } else if (!isNaN(parseFloat(part))) out.push(parseFloat(part))
+  }
+  return out.filter(v => !isNaN(v))
+}
 
-    const shapes: BoltShape[] = []
+const uniformStep = (gaps: number[]) => (gaps.length && gaps.every(g => Math.abs(g - gaps[0]) < 1e-6) ? gaps[0] : null)
 
-    // Head (Rectangle at top)
-    // Centered at x=0, top at y=0
-    shapes.push({
-        d: `M ${-headWidth / 2} 0 h ${headWidth} v ${k} h ${-headWidth} Z`,
-        fill: "none"
-    })
+function migrateLegacyBolt(o: LegacyBolt): BoltObject[] {
+  const xs = [o.offsetX || 0]
+  for (const g of parseSpacing(o.spacingX)) xs.push(xs[xs.length - 1] + g)
+  const yGaps = parseSpacing(o.spacingY)
+  const total = yGaps.reduce((a, b) => a + b, 0)
+  const ys = [-total / 2 + (o.offsetY || 0)]
+  for (const g of yGaps) ys.push(ys[ys.length - 1] + g)
 
-    // Shaft (Rectangle starting after head)
-    shapes.push({
-        d: `M ${-diameter / 2} ${k} h ${diameter} v ${length} h ${-diameter} Z`,
-        fill: "none"
-    })
+  const angleRad = Math.atan2(o.p2.y - o.p1.y, o.p2.x - o.p1.x)
+  const angle = (angleRad * 180) / Math.PI
+  const view = o.viewType === 'side' ? 'section' : 'head'
+  const base = {
+    type: 'bolt' as const, diameter: o.diameter, grade: '8.8' as const, view: view as BoltObject['view'],
+    grip: Math.max(10, (o.length ?? 60) - 30), stroke: o.stroke, showLabel: false,
+  }
+  const toWorld = (lx: number, ly: number) => ({
+    x: o.p1.x + lx * Math.cos(angleRad) - ly * Math.sin(angleRad),
+    y: o.p1.y + lx * Math.sin(angleRad) + ly * Math.cos(angleRad),
+  })
 
-    // Washer (Rectangle near the end or at some distance)
-    // Let's place it at length - m - h
-    const washerY = k + length - m - h
-    shapes.push({
-        d: `M ${-headWidth * 0.6} ${washerY} h ${headWidth * 1.2} v ${h} h ${-headWidth * 1.2} Z`,
-        fill: "none"
-    })
+  const sx = xs.length > 1 ? uniformStep(xs.slice(1).map((v, i) => v - xs[i])) : 0
+  const sy = ys.length > 1 ? uniformStep(ys.slice(1).map((v, i) => v - ys[i])) : 0
+  if (sx !== null && sy !== null) {
+    // griglia regolare: un solo oggetto ruotato attorno al centro della griglia
+    const cols = xs.length, rows = ys.length
+    const center = toWorld((xs[0] + xs[cols - 1]) / 2, (ys[0] + ys[rows - 1]) / 2)
+    const w = (cols - 1) * (sx || 0), h = (rows - 1) * (sy || 0)
+    return [{
+      ...base, id: o.id, x: center.x - w / 2, y: center.y - h / 2, rotation: angle,
+      cols, pitchX: sx || 70, rows, pitchY: sy || 70,
+    }]
+  }
+  // griglia irregolare: bulloni singoli
+  const out: BoltObject[] = []
+  for (const ly of ys) for (const lx of xs) {
+    const p = toWorld(lx, ly)
+    out.push({ ...base, id: crypto.randomUUID(), x: p.x, y: p.y, rotation: angle, cols: 1, pitchX: 70, rows: 1, pitchY: 70 })
+  }
+  return out
+}
 
-    // Nut (Rectangle after washer)
-    const nutY = washerY + h
-    shapes.push({
-        d: `M ${-headWidth / 2} ${nutY} h ${headWidth} v ${m} h ${-headWidth} Z`,
-        fill: "none"
-    })
-
-    return shapes
+/** Converte gli oggetti salvati con formati precedenti */
+export function migrateObjects(objects: CanvasObject[]): CanvasObject[] {
+  return objects.flatMap(o => {
+    const legacy = o as unknown as LegacyBolt
+    if (o.type === 'bolt' && legacy.p1 && legacy.p2) return migrateLegacyBolt(legacy)
+    return [o]
+  })
 }

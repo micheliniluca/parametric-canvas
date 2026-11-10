@@ -70,7 +70,7 @@ export const styleCaps = (o: CanvasObject | null) => {
     case 'image': return { stroke: false, width: false, dash: false, fill: false }
     case 'arrow':
     case 'quote':
-    case 'bolt': return { stroke: true, width: o.type !== 'bolt', dash: o.type === 'arrow', fill: false }
+    case 'bolt': return { stroke: true, width: true, dash: o.type === 'arrow', fill: o.type === 'bolt' }
     case 'text': return { stroke: true, width: false, dash: false, fill: true }
     case 'polyline': return { stroke: true, width: true, dash: true, fill: o.closed }
     default: return { stroke: true, width: true, dash: true, fill: true }

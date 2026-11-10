@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
-import { ALL_PROFILES } from './profiles'
+import { CATALOG_BY_SERIES, SERIES_GROUPS, SERIES_LABEL } from './profiles'
+import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './utils/boltUtils'
 import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
 import { downloadText } from './utils/project'
 import { round1 } from './utils/mathUtils'
@@ -22,7 +23,7 @@ type Props = {
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
-  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullonatura', quote: 'Quota', polyline: 'Linea',
+  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -68,7 +69,7 @@ export function RightPanel({ selected, objects, onChange, onAddObject, getCenter
 
       <div className="rp-content">
         {tab === 'catalog' && (
-          <Catalog
+          <Catalog current={selected?.type === "profile" ? selected.profileType : undefined}
             onSelect={profile => {
               const c = getCenter()
               // con un profilo selezionato, il catalogo lo sostituisce invece di aggiungerne uno nuovo
@@ -123,8 +124,8 @@ export function RightPanel({ selected, objects, onChange, onAddObject, getCenter
 }
 
 function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
-  const hasXY = o.type !== 'polyline' && o.type !== 'arrow' && o.type !== 'quote' && o.type !== 'bolt'
-  const canRotate = o.type !== 'arrow' && o.type !== 'quote' && o.type !== 'bolt'
+  const hasXY = o.type !== 'polyline' && o.type !== 'arrow' && o.type !== 'quote'
+  const canRotate = o.type !== 'arrow' && o.type !== 'quote'
 
   return (
     <div className="properties-form">
@@ -178,16 +179,20 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
               value={o.profileType}
               onChange={e => {
                 const t = e.target.value as typeof o.profileType
-                const first = ALL_PROFILES.find(p => p.type === t)
+                const first = CATALOG_BY_SERIES[t][0]
                 if (first) onChange({ profileType: t, profileName: first.name })
               }}
             >
-              {Array.from(new Set(ALL_PROFILES.map(p => p.type))).map(t => <option key={t} value={t}>{t}</option>)}
+              {SERIES_GROUPS.map(g => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.series.map(t => <option key={t} value={t}>{SERIES_LABEL[t]}</option>)}
+                </optgroup>
+              ))}
             </select>
           </Field>
           <Field label="Profilo">
             <select value={o.profileName} onChange={e => onChange({ profileName: e.target.value })}>
-              {ALL_PROFILES.filter(p => p.type === o.profileType).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+              {(CATALOG_BY_SERIES[o.profileType] ?? []).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
           </Field>
           <Field label="Vista">
@@ -209,30 +214,52 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       )}
 
       {o.type === 'bolt' && (
-        <div className="prop-grid">
-          <Field label="Diametro">
-            <select value={o.diameter} onChange={e => onChange({ diameter: Number(e.target.value) })}>
-              {[12, 16, 20, 24, 27, 30, 36].map(d => <option key={d} value={d}>M{d}</option>)}
-            </select>
-          </Field>
-          <Field label="Vista">
-            <select value={o.viewType || 'top'} onChange={e => onChange({ viewType: e.target.value as typeof o.viewType })}>
-              <option value="top">Pianta (teste)</option>
-              <option value="side">Laterale</option>
-            </select>
-          </Field>
-          <Field label="Interassi X" full>
-            <input type="text" value={o.spacingX} placeholder="es. 100 2*80" onChange={e => onChange({ spacingX: e.target.value })} />
-          </Field>
-          <Field label="Interassi Y" full>
-            <input type="text" value={o.spacingY} placeholder="es. 50 50" onChange={e => onChange({ spacingY: e.target.value })} />
-          </Field>
-          <Field label="Offset X"><Num value={o.offsetX} onChange={v => onChange({ offsetX: v })} /></Field>
-          <Field label="Offset Y"><Num value={o.offsetY} onChange={v => onChange({ offsetY: v })} /></Field>
-          {o.viewType === 'side' && (
-            <Field label="Lunghezza (mm)"><Num value={o.length || 60} min={1} onChange={v => onChange({ length: v })} /></Field>
-          )}
-        </div>
+        <>
+          <div className="prop-grid">
+            <Field label="Diametro">
+              <select value={o.diameter} onChange={e => onChange({ diameter: Number(e.target.value) })}>
+                {BOLT_DIAMETERS.map(d => <option key={d} value={d}>M{d}</option>)}
+              </select>
+            </Field>
+            <Field label="Classe">
+              <select value={o.grade} onChange={e => onChange({ grade: e.target.value as typeof o.grade })}>
+                {BOLT_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Vista" full>
+              <div className="segmented">
+                {([['head', 'Testa'], ['nut', 'Dado'], ['hole', 'Foro'], ['section', 'Sezione']] as const).map(([v, l]) => (
+                  <button key={v} type="button" className={o.view === v ? 'active' : ''} onClick={() => onChange({ view: v })}>{l}</button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Pacco serrato (mm)">
+              <Num value={o.grip} min={1} onChange={v => onChange({ grip: v })} />
+            </Field>
+            <Field label="Lunghezza">
+              <input value={`${boltLength(o)} mm`} readOnly tabIndex={-1} />
+            </Field>
+            <label className="check-label full-width">
+              <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+              Mostra designazione ({boltLabel(o)})
+            </label>
+          </div>
+          <h4>Ripetizione</h4>
+          <div className="prop-grid">
+            <Field label="Colonne"><Num value={o.cols} min={1} onChange={v => onChange({ cols: Math.round(v) })} /></Field>
+            <Field label="Passo X (mm)"><Num value={o.pitchX} min={1} onChange={v => onChange({ pitchX: v })} /></Field>
+            {o.view !== 'section' && (
+              <>
+                <Field label="Righe"><Num value={o.rows} min={1} onChange={v => onChange({ rows: Math.round(v) })} /></Field>
+                <Field label="Passo Y (mm)"><Num value={o.pitchY} min={1} onChange={v => onChange({ pitchY: v })} /></Field>
+              </>
+            )}
+            <p className="muted full-width" style={{ margin: 0 }}>
+              Passi minimi EC3 (prosp. 3.3): p1 ≥ 2,2·d0 = {round1(2.2 * boltDims(o.diameter).d0)} mm,
+              p2 ≥ 2,4·d0 = {round1(2.4 * boltDims(o.diameter).d0)} mm
+            </p>
+          </div>
+        </>
       )}
 
       {o.type === 'image' && (

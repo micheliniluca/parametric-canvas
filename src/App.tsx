@@ -13,6 +13,7 @@ import type { DrawStyle } from './style'
 import { DEFAULT_STYLE, stylePatchFor } from './style'
 import { getObjectBounds, translateObject } from './canvas/geometry'
 import { captureSvgToClipboard } from './utils/capture'
+import { migrateObjects } from './utils/boltUtils'
 import {
   loadAutosave, openProjectFile, resetFileHandle, saveProjectFile, serializeProject, writeAutosave,
 } from './utils/project'
@@ -270,7 +271,7 @@ export default function App() {
     if (!text) return false
     if (text.startsWith(CLIP_MARKER)) {
       try {
-        pasteObjects(JSON.parse(text.slice(CLIP_MARKER.length)))
+        pasteObjects(migrateObjects(JSON.parse(text.slice(CLIP_MARKER.length))))
       } catch { /* contenuto non valido */ }
       return true
     }

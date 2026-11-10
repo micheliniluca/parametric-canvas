@@ -1,5 +1,6 @@
 import type { CanvasObject } from '../types'
 import type { DrawStyle } from '../style'
+import { migrateObjects } from './boltUtils'
 
 export const PROJECT_VERSION = 1
 const AUTOSAVE_KEY = 'parametric-canvas:autosave'
@@ -24,7 +25,7 @@ export const parseProject = (text: string): ProjectFile => {
   return {
     app: 'parametric-canvas',
     version: data.version ?? 1,
-    objects: data.objects,
+    objects: migrateObjects(data.objects),
     view: data.view ?? { x: 0, y: 0 },
     zoom: data.zoom ?? 1,
     gridSize: data.gridSize ?? 50,

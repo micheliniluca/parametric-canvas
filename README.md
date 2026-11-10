@@ -28,7 +28,8 @@ npm run dev
 | N | Bollino numerato |
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |
-| B / Q / M | Bulloni / Quota / Misura |
+| B | Bullone: clic per inserirlo; diametro, classe, vista (testa, dado, foro, sezione) e ripetizione nel pannello |
+| Q / M | Quota / Misura |
 | S / O / G | Attiva SNAP / ORTO / GRIGLIA |
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |
 | Ctrl+Z / Ctrl+Y | Annulla / Ripeti |
@@ -60,5 +61,8 @@ src/
   hooks/useHistory.ts  annulla/ripeti
   utils/project.ts     salvataggio su file e autosalvataggio
   utils/export.ts      export SVG / DXF / STL
-  profiles.ts, beamPath.ts, utils/boltUtils.ts  dati e geometria dei profili e dei bulloni
+  profiles.ts          catalogo profili EN 10365 (IPE, HEA, HEB, HEM, IPN, UPN, UPE, L, RHS, CHS)
+  beamPath.ts          geometria delle sezioni (I, U, L, tubolari) e viste laterali
+  utils/boltUtils.ts   dimensioni ISO dei bulloni, viste, lunghezza, conversione dei vecchi disegni
+  icons.tsx            icone tecniche (bullone, IPE, quota ISO)
 ```

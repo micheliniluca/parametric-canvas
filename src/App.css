@@ -723,3 +723,44 @@ button:disabled {
   font-family: inherit;
   transform-origin: center;
 }
+
+.catalog-search {
+  width: 100%;
+  height: 32px;
+}
+
+.catalog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.catalog-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.catalog-tabs {
+  flex-wrap: wrap;
+}
+
+.catalog-tabs button {
+  flex: 0 0 auto;
+  min-width: 48px;
+  padding: 4px 8px;
+}
+
+.catalog-list {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.catalog-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}

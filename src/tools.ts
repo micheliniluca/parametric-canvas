@@ -1,12 +1,11 @@
-import type { LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { IconBolt, IconDimension } from './icons'
 import {
   MousePointer2,
   Minus,
   Activity,
   PenTool,
   ArrowUpRight,
-  CircleDot,
-  ArrowLeftRight,
   Ruler,
   Maximize,
   Wand2,
@@ -39,7 +38,7 @@ export type ToolId =
 export type ToolDef = {
   id: ToolId
   label: string
-  icon: LucideIcon
+  icon: ComponentType<{ size?: number | string }>
   shortcut?: string
   /** Lo strumento resta attivo dopo aver creato un oggetto */
   sticky?: boolean
@@ -59,8 +58,8 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   circle: { id: 'circle', label: 'Cerchio', icon: Circle, shortcut: 'C', hint: 'Trascina dal centro verso il bordo, clic per dimensione standard' },
   text: { id: 'text', label: 'Testo', icon: Type, shortcut: 'T', hint: 'Clic dove inserire il testo e scrivi. Ctrl+Invio o Esc per terminare' },
   arrow: { id: 'arrow', label: 'Freccia', icon: ArrowUpRight, shortcut: 'A', hint: 'Trascina dalla coda alla punta' },
-  bolt: { id: 'bolt', label: 'Bulloni', icon: CircleDot, shortcut: 'B', hint: 'Trascina lungo l\'asse della bullonatura' },
-  quote: { id: 'quote', label: 'Quota', icon: ArrowLeftRight, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
+  bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
+  quote: { id: 'quote', label: 'Quota', icon: IconDimension, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
   measure: { id: 'measure', label: 'Misura', icon: Ruler, shortcut: 'M', hint: 'Clic su due punti per misurare la distanza' },
   scale: { id: 'scale', label: 'Scala con due punti', icon: Maximize, shortcut: 'K', keepSelection: true, hint: 'Clic su due punti di distanza nota dell\'immagine (o dell\'oggetto selezionato), poi inserisci la misura reale' },
   wand: { id: 'wand', label: 'Bacchetta magica', icon: Wand2, needs: 'image', keepSelection: true, hint: 'Clic su un colore dell\'immagine per renderlo trasparente' },

@@ -1,60 +1,83 @@
 import { useMemo, useState } from 'react'
-import { CATALOG_BY_SERIES, SERIES_GROUPS, SERIES_LABEL } from '../profiles'
-import type { ProfileSeries, SteelProfile } from '../profiles'
+import { REGION_LABEL, profilesOfSeries, seriesByShape, useCatalog } from '../profiles'
+import type { ProfileRegion, SteelProfile } from '../profiles'
 
 type Props = {
   onSelect: (profile: SteelProfile) => void
-  /** Serie del profilo selezionato, se presente */
-  current?: ProfileSeries
+  /** Profilo selezionato sul disegno, se presente */
+  current?: SteelProfile
 }
 
-/** Catalogo profili per serie, con ricerca per nome o dimensione */
+const MAX_RESULTS = 200
+
+/** Catalogo profili: regione, serie raggruppate per forma, ricerca su nome / codice Maffeis / nome Tekla */
 export function Catalog({ onSelect, current }: Props) {
-  const [series, setSeries] = useState<ProfileSeries>(current ?? 'IPE')
+  const all = useCatalog()
+  const [region, setRegion] = useState<ProfileRegion>(current?.region ?? 'EU')
+  const [series, setSeries] = useState<string>(current?.series ?? 'IPE')
   const [query, setQuery] = useState('')
 
+  const groups = useMemo(() => seriesByShape(region), [region, all.length])
+  const activeSeries = groups.some(g => g.series.includes(series)) ? series : groups[0]?.series[0] ?? ''
+
   const list = useMemo(() => {
-    const q = query.trim().toLowerCase().replace(/\s+/g, '')
-    if (!q) return CATALOG_BY_SERIES[series]
-    // con una ricerca si cerca in tutte le serie
-    return Object.values(CATALOG_BY_SERIES).flat().filter(p => p.name.toLowerCase().replace(/\s+/g, '').includes(q))
-  }, [series, query])
+    // "L 100 x 100", "L100*100" e "l100x100" sono equivalenti
+    const n = (s: string) => s.toUpperCase().replace(/\s+/g, '').replace(/\*/g, 'X')
+    const q = n(query.trim())
+    if (!q) return profilesOfSeries(region, activeSeries)
+    return all.filter(p => p.region === region && (n(p.name).includes(q) || n(p.code).includes(q) || n(p.tekla).includes(q)))
+  }, [region, activeSeries, query, all])
+
+  if (all.length === 0) return <div className="catalog-empty">Caricamento catalogo…</div>
 
   return (
     <div className="catalog">
+      <div className="segmented">
+        {(['EU', 'US'] as const).map(r => (
+          <button key={r} className={region === r ? 'active' : ''} onClick={() => setRegion(r)}>{REGION_LABEL[r]}</button>
+        ))}
+      </div>
       <input
         className="catalog-search"
         type="search"
-        placeholder="Cerca (es. HEB 300, UPN 200, 80x8)…"
+        placeholder="Cerca nome o codice (es. HEB 300, SI_IPE200, L100*100*10)…"
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
       {!query &&
-        SERIES_GROUPS.map(g => (
-          <div key={g.label} className="catalog-group">
+        groups.map(g => (
+          <div key={g.shape} className="catalog-group">
             <span className="catalog-group-label">{g.label}</span>
             <div className="catalog-tabs">
               {g.series.map(t => (
-                <button key={t} className={series === t ? 'active' : ''} onClick={() => setSeries(t)} title={SERIES_LABEL[t]}>
-                  {t}
-                </button>
+                <button key={t} className={activeSeries === t ? 'active' : ''} onClick={() => setSeries(t)}>{t}</button>
               ))}
             </div>
           </div>
         ))}
       <div className="catalog-list">
-        {list.map(p => (
-          <div key={p.name} className="catalog-item" onClick={() => onSelect(p)}>
-            <div className="catalog-name">{p.name}</div>
+        {list.slice(0, MAX_RESULTS).map(p => (
+          <div
+            key={p.code}
+            className={`catalog-item ${current?.code === p.code ? 'current' : ''}`}
+            onClick={() => onSelect(p)}
+            title={`Maffeis: ${p.code}\nTekla: ${p.tekla}`}
+          >
+            <div>
+              <div className="catalog-name">{p.name}</div>
+              <div className="catalog-code">{p.code} · {p.tekla}</div>
+            </div>
             <div className="catalog-meta">
-              {p.h}×{p.b} · {p.type === 'CHS' || p.type === 'RHS' || p.type === 'L' ? `t ${p.tw}` : `${p.tw}/${p.tf}`}
+              {p.h}×{p.b}
+              {p.g ? <><br />{p.g} kg/m</> : null}
             </div>
           </div>
         ))}
+        {list.length > MAX_RESULTS && <div className="catalog-empty">Altri {list.length - MAX_RESULTS} risultati: affina la ricerca</div>}
         {list.length === 0 && <div className="catalog-empty">Nessun profilo trovato</div>}
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Dimensioni nominali EN 10365 (catalogo ArcelorMittal). Per IPN/UPN l'ala è disegnata a spessore medio.
+        {all.length.toLocaleString('it-IT')} profili dal database Maffeis. Ali rastremate (IPN, UPN…) disegnate a spessore medio.
       </p>
     </div>
   )

@@ -1,11 +1,28 @@
-import { SERIES_SHAPE } from './profiles'
-import type { ProfileSeries } from './profiles'
+import type { ProfileShape } from './profiles'
 
-const shapeOf = (type: string) => SERIES_SHAPE[type as ProfileSeries] ?? 'I'
+type BeamProps = {
+    shape?: ProfileShape
+    h: number
+    b: number
+    tw: number
+    tf: number
+    r?: number
+    viewType?: 'front' | 'side' | 'top'
+    length?: number
+}
 
-export function getBeamPoints(props: { type?: string, h: number, b: number, tw: number, tf: number, r?: number, viewType?: 'front' | 'side' | 'top', length?: number }) {
-    const { type = 'IPE', h, b, tw, tf, viewType = 'front', length = 400 } = props
-    const shape = shapeOf(type)
+export function getBeamPoints(props: BeamProps) {
+    const { h, b, tw, tf, viewType = 'front', length = 400 } = props
+    const shape = props.shape ?? 'I'
+
+    if (viewType === 'front' && shape === 'T') {
+        // T: ala in alto, anima verso il basso
+        const y0 = -h / 2, y1 = h / 2
+        return [
+            { x: -b / 2, y: y0 }, { x: b / 2, y: y0 }, { x: b / 2, y: y0 + tf }, { x: tw / 2, y: y0 + tf },
+            { x: tw / 2, y: y1 }, { x: -tw / 2, y: y1 }, { x: -tw / 2, y: y0 + tf }, { x: -b / 2, y: y0 + tf },
+        ]
+    }
 
     if (viewType === 'front' && shape === 'U') {
         // canale: anima a sinistra, ali verso destra
@@ -102,9 +119,26 @@ export function getBeamPoints(props: { type?: string, h: number, b: number, tw: 
     ]
 }
 
-export function generateBeamPath(props: { type?: string, h: number, b: number, tw: number, tf: number, r?: number, viewType?: 'front' | 'side' | 'top', length?: number }): { path: string, dashed?: string } {
-    const { type = 'IPE', h, b, tw, tf, viewType = 'front', length = 400 } = props
-    const shape = shapeOf(type)
+export function generateBeamPath(props: BeamProps): { path: string, dashed?: string } {
+    const { h, b, tw, tf, viewType = 'front', length = 400 } = props
+    const shape = props.shape ?? 'I'
+
+    if (shape === 'T') {
+        if (viewType === 'side') {
+            return { path: `M 0 ${-h / 2} L ${length} ${-h / 2} L ${length} ${h / 2} L 0 ${h / 2} Z M 0 ${-h / 2 + tf} L ${length} ${-h / 2 + tf}` }
+        }
+        if (viewType === 'top') {
+            return {
+                path: `M 0 ${-b / 2} L ${length} ${-b / 2} L ${length} ${b / 2} L 0 ${b / 2} Z`,
+                dashed: `M 0 ${-tw / 2} L ${length} ${-tw / 2} M 0 ${tw / 2} L ${length} ${tw / 2}`,
+            }
+        }
+        const y0 = -h / 2, y1 = h / 2
+        const r = Math.max(0, Math.min(props.r ?? 0, (b - tw) / 2, h - tf))
+        return {
+            path: `M ${-b / 2} ${y0} L ${b / 2} ${y0} L ${b / 2} ${y0 + tf} L ${tw / 2 + r} ${y0 + tf} A ${r} ${r} 0 0 0 ${tw / 2} ${y0 + tf + r} L ${tw / 2} ${y1} L ${-tw / 2} ${y1} L ${-tw / 2} ${y0 + tf + r} A ${r} ${r} 0 0 0 ${-tw / 2 - r} ${y0 + tf} L ${-b / 2} ${y0 + tf} Z`,
+        }
+    }
 
     if (shape === 'U' || shape === 'L') {
         if (viewType === 'side') {

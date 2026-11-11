@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
-import { CATALOG_BY_SERIES, SERIES_GROUPS, SERIES_LABEL } from './profiles'
+import { findProfile, profilesOfSeries, seriesByShape, useCatalog } from './profiles'
 import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './utils/boltUtils'
 import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
 import { downloadText } from './utils/project'
@@ -69,16 +69,16 @@ export function RightPanel({ selected, objects, onChange, onAddObject, getCenter
 
       <div className="rp-content">
         {tab === 'catalog' && (
-          <Catalog current={selected?.type === "profile" ? selected.profileType : undefined}
+          <Catalog current={selected?.type === 'profile' ? findProfile(selected.profileName) : undefined}
             onSelect={profile => {
               const c = getCenter()
               // con un profilo selezionato, il catalogo lo sostituisce invece di aggiungerne uno nuovo
               if (selected?.type === 'profile') {
-                onChange({ profileType: profile.type, profileName: profile.name })
+                onChange({ profileType: profile.series, profileName: profile.code })
                 return
               }
               onAddObject({
-                id: crypto.randomUUID(), type: 'profile', profileType: profile.type, profileName: profile.name,
+                id: crypto.randomUUID(), type: 'profile', profileType: profile.series, profileName: profile.code,
                 scale: 1, viewType: 'front', length: 400, x: c.x, y: c.y,
                 stroke: '#0f172a', strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8',
               })
@@ -123,7 +123,31 @@ export function RightPanel({ selected, objects, onChange, onAddObject, getCenter
   )
 }
 
+/** Identificazione del profilo: nome, codici e peso, copiabili con un clic */
+function ProfileHeader({ code, length }: { code: string; length: number }) {
+  useCatalog()
+  const p = findProfile(code)
+  if (!p) return <p className="muted">Profilo "{code}" non trovato nel catalogo.</p>
+  const copy = (t: string) => { navigator.clipboard?.writeText(t).catch(() => {}) }
+  return (
+    <div className="profile-id">
+      <div className="profile-id-name">{p.name}</div>
+      <button type="button" className="code-chip" title="Copia codice Maffeis" onClick={() => copy(p.code)}>
+        <span>Maffeis</span>{p.code}
+      </button>
+      <button type="button" className="code-chip" title="Copia nome Tekla" onClick={() => copy(p.tekla)}>
+        <span>Tekla</span>{p.tekla}
+      </button>
+      <div className="muted">
+        {p.h} × {p.b} · tw {p.tw} · tf {p.tf}{p.r ? ` · r ${p.r}` : ''}
+        {p.g ? <> · <b>{p.g} kg/m</b>{length > 0 ? ` · ${round1((p.g * length) / 1000)} kg su ${round1(length)} mm` : ''}</> : null}
+      </div>
+    </div>
+  )
+}
+
 function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  useCatalog()
   const hasXY = o.type !== 'polyline' && o.type !== 'arrow' && o.type !== 'quote'
   const canRotate = o.type !== 'arrow' && o.type !== 'quote'
 
@@ -172,29 +196,39 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         </div>
       )}
 
+      {o.type === 'profile' && <ProfileHeader code={o.profileName} length={o.viewType === 'front' ? 0 : o.length} />}
+
       {o.type === 'profile' && (
         <div className="prop-grid">
-          <Field label="Serie">
-            <select
-              value={o.profileType}
-              onChange={e => {
-                const t = e.target.value as typeof o.profileType
-                const first = CATALOG_BY_SERIES[t][0]
-                if (first) onChange({ profileType: t, profileName: first.name })
-              }}
-            >
-              {SERIES_GROUPS.map(g => (
-                <optgroup key={g.label} label={g.label}>
-                  {g.series.map(t => <option key={t} value={t}>{SERIES_LABEL[t]}</option>)}
-                </optgroup>
-              ))}
-            </select>
-          </Field>
-          <Field label="Profilo">
-            <select value={o.profileName} onChange={e => onChange({ profileName: e.target.value })}>
-              {(CATALOG_BY_SERIES[o.profileType] ?? []).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-            </select>
-          </Field>
+          {(() => {
+            const cur = findProfile(o.profileName)
+            const region = cur?.region ?? 'EU'
+            const series = cur?.series ?? o.profileType
+            return (
+              <>
+                <Field label="Serie">
+                  <select
+                    value={series}
+                    onChange={e => {
+                      const first = profilesOfSeries(region, e.target.value)[0]
+                      if (first) onChange({ profileType: first.series, profileName: first.code })
+                    }}
+                  >
+                    {seriesByShape(region).map(g => (
+                      <optgroup key={g.shape} label={g.label}>
+                        {g.series.map(t => <option key={t} value={t}>{t}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Profilo">
+                  <select value={cur?.code ?? o.profileName} onChange={e => onChange({ profileName: e.target.value })}>
+                    {profilesOfSeries(region, series).map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                  </select>
+                </Field>
+              </>
+            )
+          })()}
           <Field label="Vista">
             <select value={o.viewType || 'front'} onChange={e => onChange({ viewType: e.target.value as typeof o.viewType })}>
               <option value="front">Sezione</option>
@@ -207,6 +241,14 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
               <Num value={o.length || 400} min={1} onChange={v => onChange({ length: v })} />
             </Field>
           )}
+          <Field label="Etichetta">
+            <select value={o.label ?? 'none'} onChange={e => onChange({ label: e.target.value as typeof o.label })}>
+              <option value="none">Nessuna</option>
+              <option value="name">Nome</option>
+              <option value="code">Codice Maffeis</option>
+              <option value="tekla">Nome Tekla</option>
+            </select>
+          </Field>
           <Field label="Scala">
             <Num value={o.scale} min={0.01} step={0.1} onChange={v => onChange({ scale: v })} />
           </Field>

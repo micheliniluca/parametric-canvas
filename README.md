@@ -61,8 +61,21 @@ src/
   hooks/useHistory.ts  annulla/ripeti
   utils/project.ts     salvataggio su file e autosalvataggio
   utils/export.ts      export SVG / DXF / STL
-  profiles.ts          catalogo profili EN 10365 (IPE, HEA, HEB, HEM, IPN, UPN, UPE, L, RHS, CHS)
-  beamPath.ts          geometria delle sezioni (I, U, L, tubolari) e viste laterali
+  profiles.ts          catalogo profili: caricamento, ricerca, compatibilità con i nomi dei vecchi disegni
+  data/profiles.json   database profili Maffeis (generato dal CSV, vedi sotto)
+  beamPath.ts          geometria delle sezioni (I, U, L, T, tubolari) e viste laterali
   utils/boltUtils.ts   dimensioni ISO dei bulloni, viste, lunghezza, conversione dei vecchi disegni
   icons.tsx            icone tecniche (bullone, IPE, quota ISO)
 ```
+
+## Catalogo profili
+
+Il catalogo viene dal database profili Maffeis (CSV). Per aggiornarlo:
+
+```bash
+node scripts/import-profiles.mjs "C:\percorso\profiles.csv"
+```
+
+Lo script rigenera `src/data/profiles.json` tenendo solo codice Maffeis, nome Tekla, nome commerciale,
+forma, dimensioni per il disegno e peso al metro (le caratteristiche d'inerzia non servono al sito).
+Il file viene caricato a parte dopo l'apertura, quindi non rallenta l'avvio.

@@ -1,5 +1,3 @@
-import type { ProfileSeries } from './profiles'
-
 export type BaseObject = {
   id: string
   type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline'
@@ -51,11 +49,14 @@ export type TextObject = BaseObject & {
 
 export type ProfileObject = BaseObject & {
   type: 'profile'
-  profileType: ProfileSeries
+  /** Serie del catalogo (es. HEA, IPE, RHS/SHS caldo) */
+  profileType: string
   profileName: string
   scale: number
   viewType: 'front' | 'side' | 'top'
   length: number
+  /** Etichetta sul disegno */
+  label?: 'none' | 'name' | 'code' | 'tekla'
 }
 
 export type PolylineObject = {

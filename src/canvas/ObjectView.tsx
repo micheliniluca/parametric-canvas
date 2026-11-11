@@ -4,7 +4,7 @@ import { findProfile } from '../profiles'
 import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUtils'
 import { dashArray } from '../style'
-import { getObjectCenter, textSize } from './geometry'
+import { getObjectBounds, getObjectCenter, textSize } from './geometry'
 
 type Props = {
   o: CanvasObject
@@ -226,7 +226,15 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
       const s = o.scale
       const sw = o.strokeWidth ?? 1.5
       const { path, dashed } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
+      const labelText = o.label === 'name' ? profile.name : o.label === 'code' ? profile.code : o.label === 'tekla' ? profile.tekla : ''
+      const lb = labelText ? getObjectBounds(o) : null
       return (
+        <g>
+        {lb && (
+          <text transform={transform} x={lb.x} y={lb.y - 6} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+            {labelText}
+          </text>
+        )}
         <g transform={`${transform ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onMouseDown={down} pointerEvents={pe}>
           <path
             d={path} fillRule="evenodd"
@@ -239,6 +247,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
             <path d={dashed} fill="none" stroke={stroke} strokeWidth={sw / 2}
               strokeDasharray="4 2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
           )}
+        </g>
         </g>
       )
     }

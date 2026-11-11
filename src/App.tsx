@@ -14,6 +14,7 @@ import { DEFAULT_STYLE, stylePatchFor } from './style'
 import { getObjectBounds, translateObject } from './canvas/geometry'
 import { captureSvgToClipboard } from './utils/capture'
 import { migrateObjects } from './utils/boltUtils'
+import { DEFAULT_PROFILE_CODE, loadCatalog, useCatalog } from './profiles'
 import {
   loadAutosave, openProjectFile, resetFileHandle, saveProjectFile, serializeProject, writeAutosave,
 } from './utils/project'
@@ -25,6 +26,8 @@ const CLIP_MARKER = 'parametric-canvas/objects:'
 
 export default function App() {
   const history = useHistory<CanvasObject[]>([])
+  // ridisegna quando il catalogo profili è caricato
+  useCatalog()
   const objects = history.state
   const setObjects = history.setState
 
@@ -62,7 +65,8 @@ export default function App() {
      AUTOSALVATAGGIO
      ====================== */
   useEffect(() => {
-    loadAutosave().then(p => {
+    // il catalogo profili serve per disegnare i profili salvati: si attende anche quello
+    Promise.all([loadAutosave(), loadCatalog().catch(() => undefined)]).then(([p]) => {
       if (p) {
         history.reset(p.objects)
         setView(p.view)
@@ -183,7 +187,7 @@ export default function App() {
         return addObject({ id, type: 'symbol', symbolType: 'bubble', x: c.x, y: c.y, value: nextBubbleNumber, stroke: drawStyle.stroke, strokeWidth: 2, fillEnabled: true, fillColor: '#fde047' })
       case 'profile':
         setPanelOpen(true)
-        return addObject({ id, type: 'profile', profileType: 'IPE', profileName: 'IPE 200', x: c.x, y: c.y, scale: 1, viewType: 'front', length: 400, stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8' })
+        return addObject({ id, type: 'profile', profileType: 'IPE', profileName: DEFAULT_PROFILE_CODE, x: c.x, y: c.y, scale: 1, viewType: 'front', length: 400, stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8' })
     }
   }
 

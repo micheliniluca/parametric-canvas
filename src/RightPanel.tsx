@@ -1,4 +1,5 @@
 
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ScreenshotMode } from './App'
@@ -40,15 +41,45 @@ const Field = ({ label, children, full }: { label: string; children: ReactNode; 
   </label>
 )
 
-const Num = ({ value, onChange, min, step }: { value: number; onChange: (v: number) => void; min?: number; step?: number }) => (
-  <input
-    type="number" value={round1(value)} step={step}
-    onChange={e => {
-      const v = Number(e.target.value)
-      if (!isNaN(v)) onChange(min !== undefined ? Math.max(min, v) : v)
-    }}
-  />
-)
+/**
+ * Campo numerico: mentre si scrive mostra esattamente quello che si digita
+ * (es. "1" verso "10") e aggiorna l'oggetto solo con valori validi;
+ * il minimo viene applicato quando si esce dal campo o si preme Invio.
+ */
+function Num({ value, onChange, min, step }: { value: number; onChange: (v: number) => void; min?: number; step?: number }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    if (draft === null) return
+    const v = parseFloat(draft.replace(',', '.'))
+    if (!isNaN(v)) onChange(min !== undefined ? Math.max(min, v) : v)
+    setDraft(null)
+  }
+  return (
+    <input
+      type="text" inputMode="decimal" step={step}
+      value={draft ?? String(round1(value))}
+      onFocus={e => e.target.select()}
+      onChange={e => {
+        setDraft(e.target.value)
+        const v = parseFloat(e.target.value.replace(',', '.'))
+        // anteprima immediata solo se il valore è già valido
+        if (!isNaN(v) && (min === undefined || v >= min)) onChange(v)
+      }}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') setDraft(null)
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault()
+          const d = (step ?? 1) * (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+          const next = round1(value + d)
+          onChange(min !== undefined ? Math.max(min, next) : next)
+          setDraft(null)
+        }
+      }}
+    />
+  )
+}
 
 /** Pannello laterale: proprietà dell'oggetto selezionato, catalogo profili ed esportazione */
 export function RightPanel({
@@ -183,7 +214,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
             <textarea value={o.text} onChange={e => onChange({ text: e.target.value })} />
           </Field>
           <Field label="Dimensione">
-            <Num value={o.fontSize} min={4} onChange={v => onChange({ fontSize: v })} />
+            <Num value={o.fontSize} min={1} onChange={v => onChange({ fontSize: v })} />
           </Field>
           <Field label="Riquadro">
             <select value={o.boxEnabled ? 'on' : 'off'} onChange={e => onChange({ boxEnabled: e.target.value === 'on' })}>

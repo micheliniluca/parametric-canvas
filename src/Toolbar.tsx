@@ -2,13 +2,12 @@ import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ToolId } from './tools'
 import { TOOLS } from './tools'
-import { IconIPE } from './icons'
 import {
   Hash, Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
   ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose,
 } from 'lucide-react'
 
-export type AddKind = 'bubble' | 'profile'
+export type AddKind = 'bubble'
 
 type Props = {
   tool: ToolId
@@ -96,7 +95,7 @@ export function Toolbar(p: Props) {
         {toolBtn('circle')}
         {toolBtn('text')}
         <Sep />
-        <Btn title="Profilo in acciaio (catalogo nel pannello)" onClick={() => p.onAdd('profile')}><IconIPE size={18} /></Btn>
+        {toolBtn('profile')}
         {toolBtn('bolt')}
         {toolBtn('quote')}
         <Btn title="Bollino numerato (N)" onClick={() => p.onAdd('bubble')}><Hash size={18} /></Btn>

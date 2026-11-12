@@ -18,12 +18,17 @@ type Props = {
  */
 export function TextEditor({ o, zoom, view, onChange, onDone }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
+  const openedAt = useRef(0)
 
   useEffect(() => {
+    openedAt.current = Date.now()
     const el = ref.current
     if (!el) return
     el.focus()
     el.select()
+    // seconda chiamata dopo il ciclo del clic, nel caso il browser abbia spostato il focus
+    const t = window.setTimeout(() => { if (document.activeElement !== el) el.focus() }, 0)
+    return () => window.clearTimeout(t)
   }, [o.id])
 
   const fontSize = o.fontSize || 20
@@ -40,7 +45,14 @@ export function TextEditor({ o, zoom, view, onChange, onDone }: Props) {
       value={o.text}
       spellCheck={false}
       onChange={e => onChange(e.target.value)}
-      onBlur={onDone}
+      onBlur={() => {
+        // una perdita di focus subito dopo l'apertura è un effetto del clic che l'ha aperto: si ignora
+        if (Date.now() - openedAt.current < 300) {
+          window.setTimeout(() => ref.current?.focus(), 0)
+          return
+        }
+        onDone()
+      }}
       onMouseDown={e => e.stopPropagation()}
       onKeyDown={e => {
         if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {

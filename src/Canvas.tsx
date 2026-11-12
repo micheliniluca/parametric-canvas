@@ -15,6 +15,7 @@ import { SelectionOverlay } from './canvas/SelectionOverlay'
 import type { Corner, Grip } from './canvas/SelectionOverlay'
 import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
 import { TextEditor } from './canvas/TextEditor'
+import { findProfile } from './profiles'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -40,6 +41,8 @@ type Props = {
   drawStyle: DrawStyle
   onCursorMove?: (p: Point) => void
   notify?: (msg: string) => void
+  /** Codice del profilo da inserire con lo strumento Profilo */
+  placeProfileCode: string
 }
 
 /** Interazione col puntatore in corso (una sola alla volta) */
@@ -60,7 +63,7 @@ export function Canvas({
   objects, setObjects, selectedId, setSelectedId,
   view, setView, zoom, setZoom,
   gridSize, showGrid, snapEnabled, orthoEnabled,
-  tool, setTool, drawStyle, onCursorMove, notify,
+  tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const action = useRef<Interaction | null>(null)
@@ -91,6 +94,7 @@ export function Canvas({
     setMeasure(null)
     setScalePending(null)
     setScaleTargetId(null)
+    setHover(null)
     if (tool !== 'wand') setWand(null)
   }, [tool])
 
@@ -135,6 +139,12 @@ export function Canvas({
       setSelectedId(o.id)
     }
   }
+
+  const makeProfile = (code: string, series: string, p: Point): CanvasObject => ({
+    id: crypto.randomUUID(), type: 'profile', profileType: series, profileName: code,
+    x: p.x, y: p.y, scale: 1, viewType: 'front', length: 1000,
+    stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8',
+  })
 
   const strokeProps = () => ({
     stroke: drawStyle.stroke,
@@ -249,6 +259,8 @@ export function Canvas({
 
     switch (tool) {
       case 'text': {
+        // senza questo il browser, finito il clic, toglie il focus all'editor appena aperto
+        e.preventDefault()
         const p = pick(e)
         const id = crypto.randomUUID()
         setObjects(prev => [...prev, {
@@ -258,6 +270,15 @@ export function Canvas({
         setTool('select')
         setSelectedId(id)
         setEditingId(id)
+        return
+      }
+      case 'profile': {
+        const prof = findProfile(placeProfileCode)
+        if (!prof) {
+          notify?.('Scegli prima un profilo nel catalogo')
+          return
+        }
+        addObject(makeProfile(prof.code, prof.series, pick(e)))
         return
       }
       case 'bolt': {
@@ -401,6 +422,8 @@ export function Canvas({
     if (!a) {
       if (segment && (tool === 'quote' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
+      } else if (tool === 'profile') {
+        setHover(pick(e))
       } else if (polyPoints) {
         setHover(pick(e, polyPoints[polyPoints.length - 1]))
       } else if (cropPoints) {
@@ -611,6 +634,17 @@ export function Canvas({
             {selected && (tool === 'crop' || tool === 'wand' || (tool === 'scale' && scaleTargetId)) && (() => {
               const b = getObjectBounds(selected)
               return <rect x={b.x} y={b.y} width={b.w} height={b.h} {...draftStroke} />
+            })()}
+
+            {/* anteprima del profilo da inserire */}
+            {tool === 'profile' && hover && (() => {
+              const prof = findProfile(placeProfileCode)
+              if (!prof) return null
+              return (
+                <g opacity={0.45} pointerEvents="none">
+                  <ObjectView o={makeProfile(prof.code, prof.series, hover)} interactive={false} onMouseDown={() => {}} />
+                </g>
+              )
             })()}
 
             {/* bozze */}

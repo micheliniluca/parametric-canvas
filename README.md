@@ -25,6 +25,7 @@ npm run dev
 | L / P / A | Linea / Polilinea / Freccia |
 | R / C | Rettangolo / Cerchio (trascina; Shift = quadrato) |
 | T | Testo: clic e scrivi; doppio clic su un testo per modificarlo |
+| I | Profilo: scegli nel catalogo (si apre da solo) e clicca sulla tela per inserirlo |
 | N | Bollino numerato |
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |

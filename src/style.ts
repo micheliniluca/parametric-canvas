@@ -10,33 +10,38 @@ export type DrawStyle = {
 }
 
 export const DEFAULT_STYLE: DrawStyle = {
-  stroke: '#0f172a',
+  stroke: '#000000',
   strokeWidth: 2,
   strokeDash: 'solid',
   fillEnabled: false,
-  fillColor: '#bfdbfe',
+  fillColor: '#c9d7f2',
 }
 
+/** Palette "Tecnica CAD": colori dei layer CAD, più grigio e viola */
 export const STROKE_COLORS = [
-  { c: '#0f172a', n: 'Nero' },
-  { c: '#64748b', n: 'Grigio' },
-  { c: '#dc2626', n: 'Rosso' },
-  { c: '#ea580c', n: 'Arancio' },
-  { c: '#ca8a04', n: 'Ocra' },
-  { c: '#16a34a', n: 'Verde' },
-  { c: '#2563eb', n: 'Blu' },
-  { c: '#7c3aed', n: 'Viola' },
+  { c: '#000000', n: 'Nero' },
+  { c: '#808080', n: 'Grigio' },
+  { c: '#e10600', n: 'Rosso' },
+  { c: '#ff8c00', n: 'Arancio' },
+  { c: '#f5c400', n: 'Giallo' },
+  { c: '#00a651', n: 'Verde' },
+  { c: '#00a3e0', n: 'Ciano' },
+  { c: '#0047bb', n: 'Blu' },
+  { c: '#7b2fbe', n: 'Viola' },
+  { c: '#c4007a', n: 'Magenta' },
 ]
 
 export const FILL_COLORS = [
   { c: '#ffffff', n: 'Bianco' },
-  { c: '#e2e8f0', n: 'Grigio' },
-  { c: '#fecaca', n: 'Rosso' },
-  { c: '#fed7aa', n: 'Arancio' },
-  { c: '#fef08a', n: 'Giallo' },
-  { c: '#bbf7d0', n: 'Verde' },
-  { c: '#bfdbfe', n: 'Azzurro' },
-  { c: '#ddd6fe', n: 'Lilla' },
+  { c: '#e6e6e6', n: 'Grigio' },
+  { c: '#ffd6d4', n: 'Rosso' },
+  { c: '#ffe2c2', n: 'Arancio' },
+  { c: '#fff1b3', n: 'Giallo' },
+  { c: '#c9f0d9', n: 'Verde' },
+  { c: '#c7ecf8', n: 'Ciano' },
+  { c: '#c9d7f2', n: 'Blu' },
+  { c: '#e2d4f5', n: 'Viola' },
+  { c: '#f5cce3', n: 'Magenta' },
 ]
 
 export const STROKE_WIDTHS = [1, 2, 3, 5]

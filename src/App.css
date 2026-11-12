@@ -822,3 +822,21 @@ button:disabled {
 .code-chip:hover {
   border-color: var(--primary);
 }
+
+.placing-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #3730a3;
+}
+
+.placing-banner span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}

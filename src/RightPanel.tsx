@@ -1,4 +1,4 @@
-import { useState } from 'react'
+
 import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ScreenshotMode } from './App'
@@ -19,7 +19,14 @@ type Props = {
   screenshotMode: ScreenshotMode
   setScreenshotMode: (m: ScreenshotMode) => void
   onScreenshot: () => void
+  tab: PanelTab
+  setTab: (t: PanelTab) => void
+  /** Profilo in attesa di essere inserito con un clic sulla tela (strumento Profilo attivo) */
+  placingProfileCode: string | null
+  onPickProfile: (code: string) => void
 }
+
+export type PanelTab = 'props' | 'catalog' | 'export'
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
@@ -44,8 +51,11 @@ const Num = ({ value, onChange, min, step }: { value: number; onChange: (v: numb
 )
 
 /** Pannello laterale: proprietà dell'oggetto selezionato, catalogo profili ed esportazione */
-export function RightPanel({ selected, objects, onChange, onAddObject, getCenter, screenshotMode, setScreenshotMode, onScreenshot }: Props) {
-  const [tab, setTab] = useState<'props' | 'catalog' | 'export'>('props')
+export function RightPanel({
+  selected, objects, onChange, screenshotMode, setScreenshotMode, onScreenshot,
+  tab, setTab, placingProfileCode, onPickProfile,
+}: Props) {
+  const placing = placingProfileCode ? findProfile(placingProfileCode) : undefined
 
   const handleExport = (format: 'svg' | 'dxf' | 'stl') => {
     if (format === 'svg') downloadText(exportToSVG(objects), 'disegno.svg', 'image/svg+xml')
@@ -69,21 +79,28 @@ export function RightPanel({ selected, objects, onChange, onAddObject, getCenter
 
       <div className="rp-content">
         {tab === 'catalog' && (
-          <Catalog current={selected?.type === 'profile' ? findProfile(selected.profileName) : undefined}
-            onSelect={profile => {
-              const c = getCenter()
-              // con un profilo selezionato, il catalogo lo sostituisce invece di aggiungerne uno nuovo
-              if (selected?.type === 'profile') {
-                onChange({ profileType: profile.series, profileName: profile.code })
-                return
-              }
-              onAddObject({
-                id: crypto.randomUUID(), type: 'profile', profileType: profile.series, profileName: profile.code,
-                scale: 1, viewType: 'front', length: 400, x: c.x, y: c.y,
-                stroke: '#0f172a', strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8',
-              })
-            }}
-          />
+          <>
+            {placing && (
+              <div className="placing-banner">
+                Clic sulla tela per inserire <b>{placing.name}</b>
+                <span>Esc per annullare</span>
+              </div>
+            )}
+            {selected?.type === 'profile' && !placing && (
+              <div className="placing-banner">
+                La scelta sostituisce il profilo selezionato
+                <span>Esc per deselezionare e inserirne uno nuovo</span>
+              </div>
+            )}
+            <Catalog
+              current={selected?.type === 'profile' ? findProfile(selected.profileName) : placing}
+              onSelect={profile => {
+                // con un profilo selezionato la scelta lo sostituisce; altrimenti si inserisce con un clic sulla tela
+                if (selected?.type === 'profile') onChange({ profileType: profile.series, profileName: profile.code })
+                else onPickProfile(profile.code)
+              }}
+            />
+          </>
         )}
 
         {tab === 'export' && (

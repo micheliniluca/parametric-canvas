@@ -6,6 +6,7 @@ import { Canvas } from './Canvas'
 import { Toolbar } from './Toolbar'
 import type { AddKind } from './Toolbar'
 import { RightPanel } from './RightPanel'
+import type { PanelTab } from './RightPanel'
 import { StyleBar } from './StyleBar'
 import { StatusBar } from './StatusBar'
 import { useHistory } from './hooks/useHistory'
@@ -42,6 +43,9 @@ export default function App() {
   const [drawStyle, setDrawStyle] = useState<DrawStyle>(DEFAULT_STYLE)
   const [nextBubbleNumber, setNextBubbleNumber] = useState(1)
   const [panelOpen, setPanelOpen] = useState(true)
+  const [panelTab, setPanelTab] = useState<PanelTab>('props')
+  /** Profilo che lo strumento Profilo inserisce al clic */
+  const [placeProfile, setPlaceProfile] = useState(DEFAULT_PROFILE_CODE)
   const [screenshotMode, setScreenshotMode] = useState<ScreenshotMode>('white')
   const [cursor, setCursor] = useState<Point | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -57,6 +61,11 @@ export default function App() {
 
   const setTool = useCallback((t: ToolId) => {
     setToolRaw(t)
+    // lo strumento Profilo apre il catalogo per scegliere cosa inserire
+    if (t === 'profile') {
+      setPanelOpen(true)
+      setPanelTab('catalog')
+    }
     // gli strumenti che lavorano su un oggetto mantengono la selezione
     if (t !== 'select' && !TOOLS[t].keepSelection) setSelectedId(null)
   }, [])
@@ -185,9 +194,6 @@ export default function App() {
       case 'bubble':
         setNextBubbleNumber(n => n + 1)
         return addObject({ id, type: 'symbol', symbolType: 'bubble', x: c.x, y: c.y, value: nextBubbleNumber, stroke: drawStyle.stroke, strokeWidth: 2, fillEnabled: true, fillColor: '#fde047' })
-      case 'profile':
-        setPanelOpen(true)
-        return addObject({ id, type: 'profile', profileType: 'IPE', profileName: DEFAULT_PROFILE_CODE, x: c.x, y: c.y, scale: 1, viewType: 'front', length: 400, stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#94a3b8' })
     }
   }
 
@@ -450,6 +456,7 @@ export default function App() {
             drawStyle={drawStyle}
             onCursorMove={setCursor}
             notify={notify}
+            placeProfileCode={placeProfile}
           />
 
           <StyleBar selected={selected} drawStyle={drawStyle} onChange={onStyleChange} />
@@ -492,6 +499,13 @@ export default function App() {
               screenshotMode={screenshotMode}
               setScreenshotMode={setScreenshotMode}
               onScreenshot={screenshot}
+              tab={panelTab}
+              setTab={setPanelTab}
+              placingProfileCode={tool === 'profile' ? placeProfile : null}
+              onPickProfile={code => {
+                setPlaceProfile(code)
+                setTool('profile')
+              }}
             />
           </aside>
         )}

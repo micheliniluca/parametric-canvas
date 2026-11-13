@@ -3,6 +3,7 @@ import type { CanvasObject } from '../types'
 import { findProfile } from '../profiles'
 import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUtils'
+import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { dashArray } from '../style'
 import { getObjectBounds, getObjectCenter, textSize } from './geometry'
 
@@ -197,6 +198,43 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
           {o.showLabel && (
             <text x={b.x + b.w + 6} y={b.y - 4} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
               {boltLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'cable': {
+      const sw = o.strokeWidth ?? 1.5
+      const dr = cableDrawing(o)
+      const fill = o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'
+      const textAngle = dr.angle > 90 || dr.angle < -90 ? dr.angle + 180 : dr.angle
+      const fs = Math.max(14, o.size * 1.2)
+      const off = o.size / 2 + fs * 0.4
+      // il testo va sempre "sopra" la fune, dal lato leggibile
+      const side = textAngle === dr.angle ? -1 : 1
+      const mid = { x: (o.x1 + o.x2) / 2 + dr.v.x * off * side, y: (o.y1 + o.y2) / 2 + dr.v.y * off * side }
+      return (
+        <g transform={transform} onMouseDown={down}>
+          <path d={dr.axis} stroke="transparent" strokeWidth={14} vectorEffect="non-scaling-stroke" fill="none"
+            pointerEvents={interactive ? 'stroke' : 'none'} />
+          <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.5}
+            strokeDasharray="12 3 2 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+          {dr.rope && (
+            <path d={dr.rope} fill={fill} stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round" pointerEvents={pe} />
+          )}
+          {dr.outline && (
+            <path d={dr.outline} fill={fill} fillRule="evenodd" stroke={stroke} strokeWidth={sw}
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
+          )}
+          {dr.thin && (
+            <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+          )}
+          {o.showLabel !== false && (
+            <text transform={`translate(${mid.x}, ${mid.y}) rotate(${textAngle})`} fontSize={fs} fill={stroke}
+              textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>
+              {cableLabel(o)}
             </text>
           )}
         </g>

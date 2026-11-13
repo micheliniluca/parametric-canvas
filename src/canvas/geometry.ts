@@ -2,6 +2,7 @@ import type { CanvasObject, Point } from '../types'
 import { findProfile } from '../profiles'
 import { getBeamPoints } from '../beamPath'
 import { boltBounds, boltCenters } from '../utils/boltUtils'
+import { cableBounds } from '../utils/cableUtils'
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -60,6 +61,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return fromPoints([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }])
     case 'bolt':
       return boltBounds(o)
+    case 'cable':
+      return cableBounds(o)
     case 'profile': {
       const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
@@ -75,7 +78,7 @@ export const getObjectCenter = (o: CanvasObject): Point => {
     if (o.viewType === 'front') return { x: o.x, y: o.y }
     return { x: o.x + (o.length / 2) * o.scale, y: o.y }
   }
-  if (o.type === 'arrow' || o.type === 'quote') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
+  if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') return { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
   const b = getObjectBounds(o)
   return { x: b.x + b.w / 2, y: b.y + b.h / 2 }
 }
@@ -88,6 +91,7 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
       return { ...o, points: o.points.map(mv) }
     case 'arrow':
     case 'quote':
+    case 'cable':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
     default:
       return { ...o, x: o.x + dx, y: o.y + dy }
@@ -97,7 +101,7 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
 /** Punto di riferimento usato per il trascinamento */
 export const refPointOf = (o: CanvasObject): Point => {
   if (o.type === 'polyline') return o.points[0] ?? { x: 0, y: 0 }
-  if (o.type === 'arrow' || o.type === 'quote') return { x: o.x1, y: o.y1 }
+  if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') return { x: o.x1, y: o.y1 }
   return { x: o.x, y: o.y }
 }
 
@@ -127,7 +131,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
     case 'polyline':
       return { ...obj, points: obj.points.map(sp) }
     case 'arrow':
-    case 'quote': {
+    case 'quote':
+    case 'cable': {
       const p1 = sp({ x: obj.x1, y: obj.y1 })
       const p2 = sp({ x: obj.x2, y: obj.y2 })
       return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
@@ -202,7 +207,7 @@ export const getSnapPoint = (
       addRing(o.points.map(r), o.closed && o.points.length > 2)
     } else if (o.type === 'bolt') {
       candidates.push(...boltCenters(o).map(r))
-    } else if (o.type === 'arrow' || o.type === 'quote') {
+    } else if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') {
       addRing([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }].map(r), false)
     }
   }
@@ -242,7 +247,7 @@ export const unionBounds = (objs: CanvasObject[]): Box | null => {
 export const rotateObjectAround = (o: CanvasObject, center: Point, deg: number): CanvasObject => {
   if (!deg) return o
   const rp = (p: Point) => rotatePoint(p, center, deg)
-  if (o.type === 'arrow' || o.type === 'quote') {
+  if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') {
     const p1 = rp({ x: o.x1, y: o.y1 })
     const p2 = rp({ x: o.x2, y: o.y2 })
     return { ...o, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }

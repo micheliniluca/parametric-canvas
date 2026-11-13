@@ -1,11 +1,14 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CanvasObject } from './types'
+import type { CableObject, CanvasObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { findProfile, profilesOfSeries, seriesByShape, useCatalog } from './profiles'
 import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './utils/boltUtils'
+import {
+  FLC_SIZES, cableLabel, cableMass, cableNRd, cableSpan, flcRope, ropeLength, socketCount, ttfSocket,
+} from './utils/cableUtils'
 import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
 import { downloadText } from './utils/project'
 import { round1 } from './utils/mathUtils'
@@ -42,7 +45,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
-  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea',
+  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -209,6 +212,84 @@ function ProfileHeader({ code, length }: { code: string; length: number }) {
   )
 }
 
+/** Cavo FLC: taglia, forcelle alle estremità A e B, lunghezze e resistenze */
+function CableProps({ o, onChange }: { o: CableObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const rope = flcRope(o.size)
+  const sock = ttfSocket(o.size)
+  const span = cableSpan(o)
+  const n = socketCount(o)
+  // cambia l'interasse spostando l'estremità B lungo l'asse
+  const setSpan = (L: number) => {
+    const u = span > 0 ? { x: (o.x2 - o.x1) / span, y: (o.y2 - o.y1) / span } : { x: 1, y: 0 }
+    onChange({ x2: o.x1 + u.x * L, y2: o.y1 + u.y * L })
+  }
+  const swap = () => onChange({
+    x1: o.x2, y1: o.y2, x2: o.x1, y2: o.y1, startSocket: o.endSocket, endSocket: o.startSocket,
+  })
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{cableLabel(o)}</div>
+        <div className="muted">
+          Ø {rope.d} · A {rope.A} mm² · EA {rope.EA} MN · <b>{rope.mass} kg/m</b>
+        </div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Fune">
+          <select value={o.size} onChange={e => onChange({ size: Number(e.target.value) })}>
+            {FLC_SIZES.map(d => <option key={d} value={d}>FLC {d}</option>)}
+          </select>
+        </Field>
+        <Field label="Interasse (mm)">
+          <Num value={span} min={1} onChange={setSpan} />
+        </Field>
+      </div>
+
+      <h4>Forcelle TTF {sock.size}</h4>
+      <div className="prop-grid">
+        <label className="check-label">
+          <input type="checkbox" checked={o.startSocket} onChange={e => onChange({ startSocket: e.target.checked })} />
+          Estremità A
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={o.endSocket} onChange={e => onChange({ endSocket: e.target.checked })} />
+          Estremità B
+        </label>
+        <button type="button" className="btn-secondary full-width" onClick={swap}>Inverti A ↔ B</button>
+        <p className="muted full-width" style={{ margin: 0 }}>
+          A è il primo punto disegnato, B il secondo: sulla tela li vedi nei cerchietti quando il cavo è selezionato.
+        </p>
+      </div>
+
+      <table className="data-table">
+        <tbody>
+          <tr><th>Lunghezza fune</th><td>{round1(ropeLength(o))} mm{n ? ` (interasse − ${n}×F)` : ''}</td></tr>
+          <tr><th>Peso</th><td>{round1(cableMass(o))} kg</td></tr>
+          <tr><th>Fuk / FRd fune</th><td>{rope.Fuk} / {rope.FRd} kN</td></tr>
+          {n > 0 && <tr><th>Nuk / NRd forcella</th><td>{sock.Nuk} / {sock.NRd} kN</td></tr>}
+          <tr><th>NRd tirante</th><td><b>{cableNRd(o)} kN</b></td></tr>
+          {n > 0 && (
+            <>
+              <tr><th>Forcella C · F · E</th><td>{sock.C} · {sock.F} · {sock.E} mm</td></tr>
+              <tr><th>Foro perno</th><td>Ø {sock.Dhole} mm</td></tr>
+              <tr><th>Apertura T</th><td>{sock.Tmin}–{sock.Tmax} mm (S max {sock.Smax})</td></tr>
+              <tr><th>Massa forcella</th><td>{sock.mass} kg</td></tr>
+            </>
+          )}
+        </tbody>
+      </table>
+      <p className="muted" style={{ margin: 0 }}>Catalogo Redaelli · FRd = Fuk / 1,5 (EN 1993-1-11, γR = 1,0).</p>
+
+      <div className="prop-grid">
+        <label className="check-label full-width">
+          <input type="checkbox" checked={o.showLabel !== false} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
 /** Più oggetti selezionati: riepilogo, gruppi, allinea e distribuisci */
 function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
   objs: CanvasObject[]
@@ -226,6 +307,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
   let weight = 0
   let weighed = 0
   for (const o of objs) {
+    if (o.type === 'cable') { weight += cableMass(o); weighed++; continue }
     if (o.type !== 'profile' || o.viewType === 'front') continue
     const g = findProfile(o.profileName)?.g
     if (g) { weight += (g * o.length) / 1000; weighed++ }
@@ -248,7 +330,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
         {[...counts].map(([label, n]) => <span key={label}>{n} × {label}</span>)}
       </div>
       {weighed > 0 && (
-        <p className="muted" style={{ margin: 0 }}>Peso profili (viste laterali/dall'alto): <b>{round1(weight)} kg</b></p>
+        <p className="muted" style={{ margin: 0 }}>Peso (profili in vista laterale/dall'alto, cavi): <b>{round1(weight)} kg</b></p>
       )}
       {locked > 0 && <p className="muted" style={{ margin: 0 }}>{locked} bloccati: non si spostano.</p>}
 
@@ -285,8 +367,9 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
 
 function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   useCatalog()
-  const hasXY = o.type !== 'polyline' && o.type !== 'arrow' && o.type !== 'quote'
-  const canRotate = o.type !== 'arrow' && o.type !== 'quote'
+  const isEndpoint = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable'
+  const hasXY = o.type !== 'polyline' && !isEndpoint
+  const canRotate = !isEndpoint
 
   return (
     <div className="properties-form">
@@ -441,6 +524,8 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         </>
       )}
 
+      {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
+
       {o.type === 'image' && (
         <div className="prop-grid">
           <Field label="Opacità" full>
@@ -473,7 +558,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {o.type === 'circle' && (
           <Field label="Diametro"><Num value={o.radius * 2} min={1} onChange={v => onChange({ radius: v / 2 })} /></Field>
         )}
-        {(o.type === 'arrow' || o.type === 'quote') && (
+        {isEndpoint && (
           <>
             <Field label="X1"><Num value={o.x1} onChange={v => onChange({ x1: v })} /></Field>
             <Field label="Y1"><Num value={o.y1} onChange={v => onChange({ y1: v })} /></Field>
@@ -484,7 +569,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {canRotate && (
           <Field label="Rotazione (°)"><Num value={o.rotation || 0} onChange={v => onChange({ rotation: v })} /></Field>
         )}
-        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile') && (
+        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable') && (
           <Field label="Spessore linea"><Num value={o.strokeWidth ?? 2} min={0.25} step={0.5} onChange={v => onChange({ strokeWidth: v })} /></Field>
         )}
       </div>

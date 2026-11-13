@@ -22,6 +22,17 @@ export const IconBolt = ({ size }: Props) => (
   </Svg>
 )
 
+/** Fune con forcelle alle due estremità */
+export const IconCable = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 8.2 15.8 L 15.8 8.2" strokeWidth={2.5} />
+    <path d="M 3.2 20.8 A 3.4 3.4 0 0 1 3.6 15.2 L 6.2 13.4 L 10.6 17.8 L 8.8 20.4 A 3.4 3.4 0 0 1 3.2 20.8 Z" strokeWidth={1.5} />
+    <path d="M 20.8 3.2 A 3.4 3.4 0 0 1 20.4 8.8 L 17.8 10.6 L 13.4 6.2 L 15.2 3.6 A 3.4 3.4 0 0 1 20.8 3.2 Z" strokeWidth={1.5} />
+    <circle cx="5.2" cy="18.8" r="1" fill="currentColor" strokeWidth={0} />
+    <circle cx="18.8" cy="5.2" r="1" fill="currentColor" strokeWidth={0} />
+  </Svg>
+)
+
 /** Sezione di una trave IPE con raccordi */
 export const IconIPE = ({ size }: Props) => (
   <Svg size={size}>

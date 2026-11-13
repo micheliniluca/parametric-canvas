@@ -16,6 +16,7 @@ import type { Corner, Grip } from './canvas/SelectionOverlay'
 import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
 import { TextEditor } from './canvas/TextEditor'
 import { findProfile } from './profiles'
+import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -155,6 +156,19 @@ export function Canvas({
     id: crypto.randomUUID(), type: 'symbol', symbolType: 'bubble', x: p.x, y: p.y, value,
     stroke: drawStyle.stroke, strokeWidth: 2, fillEnabled: true, fillColor: '#fde047',
   })
+
+  // un nuovo cavo riprende taglia e forcelle dell'ultimo cavo disegnato
+  const makeCable = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'cable')
+    return {
+      id: crypto.randomUUID(), type: 'cable', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      size: last?.type === 'cable' ? last.size : DEFAULT_CABLE_SIZE,
+      startSocket: last?.type === 'cable' ? last.startSocket : true,
+      endSocket: last?.type === 'cable' ? last.endSocket : true,
+      showLabel: true,
+      stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#cbd5e1',
+    }
+  }
 
   const makeProfile = (code: string, series: string, p: Point): CanvasObject => ({
     id: crypto.randomUUID(), type: 'profile', profileType: series, profileName: code,
@@ -351,6 +365,7 @@ export function Canvas({
         action.current = { kind: 'freehand' }
         return
       case 'quote':
+      case 'cable':
       case 'measure':
       case 'scale': {
         const p = pick(e, segment?.p1)
@@ -420,6 +435,8 @@ export function Canvas({
         x1: s.p1.x, y1: s.p1.y, x2: s.p2.x, y2: s.p2.y,
         stroke: drawStyle.stroke, textColor: drawStyle.stroke, strokeWidth: 1,
       })
+    } else if (tool === 'cable') {
+      addObject(makeCable(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -468,7 +485,7 @@ export function Canvas({
 
     // Anteprime degli strumenti a clic
     if (!a) {
-      if (segment && (tool === 'quote' || tool === 'measure' || tool === 'scale')) {
+      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -558,7 +575,7 @@ export function Canvas({
 
       case 'end':
         updateObject(a.id, o => {
-          if (o.type === 'arrow' || o.type === 'quote') {
+          if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') {
             const other = a.end === 'p1' ? { x: o.x2, y: o.y2 } : { x: o.x1, y: o.y1 }
             const p = pick(e, other, a.id)
             return a.end === 'p1' ? { ...o, x1: p.x, y1: p.y } : { ...o, x2: p.x, y2: p.y }
@@ -791,6 +808,11 @@ export function Canvas({
                 stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}
                 strokeDasharray={dashArray(drawStyle.strokeDash, drawStyle.strokeWidth)} pointerEvents="none"
               />
+            )}
+            {segment && tool === 'cable' && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={makeCable(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
+              </g>
             )}
             {segment && tool !== 'line' && tool !== 'rect' && tool !== 'circle' && (
               <g pointerEvents="none">

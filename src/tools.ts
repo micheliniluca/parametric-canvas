@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { IconBolt, IconDimension, IconIPE } from './icons'
+import { IconBolt, IconCable, IconDimension, IconIPE } from './icons'
 import {
   MousePointer2,
   Minus,
@@ -32,6 +32,7 @@ export type ToolId =
   | 'freehand'
   | 'arrow'
   | 'bolt'
+  | 'cable'
   | 'quote'
   | 'measure'
   | 'scale'
@@ -64,6 +65,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   bubble: { id: 'bubble', label: 'Bollino numerato', icon: Hash, shortcut: 'N', sticky: true, hint: 'Clic sulla tela per inserire i bollini in sequenza (1, 2, 3…). Esc per terminare' },
   arrow: { id: 'arrow', label: 'Freccia', icon: ArrowUpRight, shortcut: 'A', hint: 'Trascina dalla coda alla punta' },
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
+  cable: { id: 'cable', label: 'Cavo FLC con forcelle', icon: IconCable, shortcut: 'F', hint: 'Clic sul primo perno (estremità A), clic sul secondo (B). Ctrl = snap. Taglia e forcelle nel pannello' },
   quote: { id: 'quote', label: 'Quota', icon: IconDimension, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
   measure: { id: 'measure', label: 'Misura', icon: Ruler, shortcut: 'M', hint: 'Clic su due punti per misurare la distanza' },
   scale: { id: 'scale', label: 'Scala con due punti', icon: Maximize, shortcut: 'K', keepSelection: true, hint: 'Clic su due punti di distanza nota dell\'immagine (o dell\'oggetto selezionato), poi inserisci la misura reale' },
@@ -74,5 +76,5 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 /** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
-  t === 'bolt' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'bolt' || t === 'cable' || t === 'quote' || t === 'measure' || t === 'scale' ||
   t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

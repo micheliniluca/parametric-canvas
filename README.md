@@ -35,6 +35,7 @@ npm run dev
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |
 | B | Bullone: clic per inserirlo; diametro, classe, vista (testa, dado, foro, sezione) e ripetizione nel pannello |
+| F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | Q / M | Quota / Misura |
 | S / O / G | Attiva SNAP / ORTO / GRIGLIA |
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |

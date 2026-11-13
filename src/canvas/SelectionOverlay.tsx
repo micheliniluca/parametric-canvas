@@ -3,6 +3,7 @@ import type { CanvasObject } from '../types'
 import { getObjectBounds, getObjectCenter, rotatePoint, textSize, unionBounds, worldBounds } from './geometry'
 import type { Point } from '../types'
 import { round1 } from '../utils/mathUtils'
+import { ttfSocket } from '../utils/cableUtils'
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br'
 export type Grip =
@@ -40,7 +41,7 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
   )
 
   const locked = !!o.locked
-  const isEndpointType = o.type === 'arrow' || o.type === 'quote'
+  const isEndpointType = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable'
   const showVertices = !locked && o.type === 'polyline' && o.points.length <= MAX_VERTEX_GRIPS
   const showBox = locked || (!isEndpointType && !showVertices)
   const b = getObjectBounds(o)
@@ -55,6 +56,7 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
   if (o.type === 'rect' || o.type === 'image') parts.push(`${round1(o.width)} × ${round1(o.height)}`)
   else if (o.type === 'circle') parts.push(`Ø ${round1(o.radius * 2)}`)
   else if (o.type === 'bolt') parts.push(`M${o.diameter}${o.cols * (o.view === 'section' ? 1 : o.rows) > 1 ? ` · ${o.cols}×${o.view === 'section' ? 1 : o.rows}` : ''}`)
+  else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)
   const label = parts.join('  ·  ')
@@ -98,7 +100,23 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
           // nelle polilinee chiuse l'ultimo punto coincide col primo
           o.closed && i === o.points.length - 1 && o.points.length > 1 ? null : grip(i, p.x, p.y, { kind: 'vertex', index: i }, 'move'),
         )}
-        {!locked && (o.type === 'arrow' || o.type === 'quote') && (
+        {o.type === 'cable' && (() => {
+          // lettere A e B oltre le estremità, per riconoscerle nel pannello
+          const L = Math.hypot(o.x2 - o.x1, o.y2 - o.y1) || 1
+          const ux = (o.x2 - o.x1) / L, uy = (o.y2 - o.y1) / L
+          const C = ttfSocket(o.size).C
+          const offA = (o.startSocket ? C : 0) + 16 * k
+          const offB = (o.endSocket ? C : 0) + 16 * k
+          return ([['A', o.x1 - ux * offA, o.y1 - uy * offA, o.startSocket], ['B', o.x2 + ux * offB, o.y2 + uy * offB, o.endSocket]] as const)
+            .map(([t, x, y, on]) => (
+              <g key={t} pointerEvents="none">
+                <circle cx={x} cy={y} r={9 * k} fill={on ? ACCENT : 'white'} stroke={ACCENT} strokeWidth={1.5 * k} />
+                <text x={x} y={y} fontSize={11 * k} fontWeight="bold" fill={on ? 'white' : ACCENT}
+                  textAnchor="middle" dominantBaseline="central" style={{ userSelect: 'none' }}>{t}</text>
+              </g>
+            ))
+        })()}
+        {!locked && isEndpointType && (
           <>
             {grip('p1', o.x1, o.y1, { kind: 'end', end: 'p1' }, 'move')}
             {grip('p2', o.x2, o.y2, { kind: 'end', end: 'p2' }, 'move')}

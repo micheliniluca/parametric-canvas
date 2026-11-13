@@ -890,3 +890,25 @@ button:disabled {
   background: var(--border-color);
   margin: 0 4px;
 }
+
+/* tabella dati (cavi) */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  padding-right: 8px;
+  white-space: nowrap;
+}

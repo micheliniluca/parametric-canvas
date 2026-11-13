@@ -1,0 +1,9 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { TOOLS } from './tools';
+import { Minus, Plus, Maximize2 } from 'lucide-react';
+/** Barra inferiore stile CAD: aiuti al disegno, coordinate, zoom e suggerimento dello strumento */
+export function StatusBar(p) {
+    const toggle = (label, on, set, key, title) => (_jsx("button", { className: `st-toggle ${on ? 'on' : ''}`, onClick: () => set(!on), title: `${title} (${key})`, "aria-pressed": on, children: label }));
+    return (_jsxs("div", { className: "statusbar", onMouseDown: e => e.stopPropagation(), children: [_jsxs("div", { className: "st-group", children: [toggle('SNAP', p.snapEnabled, p.setSnapEnabled, 'S', 'Aggancio a vertici, punti medi e griglia — tieni Ctrl per uno snap temporaneo'), toggle('ORTO', p.orthoEnabled, p.setOrthoEnabled, 'O', 'Vincolo ortogonale — tieni Shift per uno temporaneo'), toggle('GRIGLIA', p.showGrid, p.setShowGrid, 'G', 'Mostra griglia'), _jsxs("label", { className: "st-grid", title: "Passo griglia (mm)", children: [_jsx("input", { type: "number", min: 1, value: p.gridSize, onChange: e => { const v = Number(e.target.value); if (v >= 1)
+                                    p.setGridSize(v); } }), "mm"] })] }), _jsx("div", { className: "st-hint", children: TOOLS[p.tool].hint }), _jsxs("div", { className: "st-group", children: [_jsx("span", { className: "st-coords", children: p.cursor ? `X ${Math.round(p.cursor.x)}  Y ${Math.round(p.cursor.y)}` : '' }), _jsx("button", { className: "st-icon", onClick: p.onZoomOut, title: "Riduci (\u2212)", children: _jsx(Minus, { size: 14 }) }), _jsxs("span", { className: "st-zoom", children: [Math.round(p.zoom * 100), "%"] }), _jsx("button", { className: "st-icon", onClick: p.onZoomIn, title: "Ingrandisci (+)", children: _jsx(Plus, { size: 14 }) }), _jsx("button", { className: "st-icon", onClick: p.onZoomFit, title: "Adatta alla vista (Ctrl+0)", children: _jsx(Maximize2, { size: 14 }) })] })] }));
+}

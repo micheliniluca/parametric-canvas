@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable'
   x: number
   y: number
   stroke?: string
@@ -114,6 +114,26 @@ export type BoltObject = BaseObject & {
   showLabel?: boolean
 }
 
+/**
+ * Fune spiroidale chiusa FLC con forcelle TTF (catalogo Redaelli).
+ * (x1, y1) = estremità A, (x2, y2) = estremità B: centro del perno se c'è la forcella,
+ * altrimenti l'estremità della fune.
+ */
+export type CableObject = BaseObject & {
+  type: 'cable'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  /** Diametro nominale FLC (mm) */
+  size: number
+  /** Forcella all'estremità A */
+  startSocket: boolean
+  /** Forcella all'estremità B */
+  endSocket: boolean
+  showLabel?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -125,4 +145,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject

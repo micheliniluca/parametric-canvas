@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# output di tsc -b lanciato a mano
+src/**/*.js
+*.tsbuildinfo

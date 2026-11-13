@@ -9,7 +9,7 @@ import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './
 import {
   FLC_SIZES, cableLabel, cableMass, cableNRd, cableSpan, flcRope, ropeLength, socketCount, ttfSocket,
 } from './utils/cableUtils'
-import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
+import { exportToDXF } from './utils/export'
 import { downloadText } from './utils/project'
 import { round1 } from './utils/mathUtils'
 import {
@@ -102,10 +102,8 @@ export function RightPanel({
 }: Props) {
   const placing = placingProfileCode ? findProfile(placingProfileCode) : undefined
 
-  const handleExport = (format: 'svg' | 'dxf' | 'stl') => {
-    if (format === 'svg') downloadText(exportToSVG(objects), 'disegno.svg', 'image/svg+xml')
-    if (format === 'dxf') downloadText(exportToDXF(objects), 'disegno.dxf', 'application/dxf')
-    if (format === 'stl') downloadText(exportToSTL(objects), 'disegno.stl', 'model/stl')
+  const handleExport = () => {
+    downloadText(exportToDXF(objects), 'disegno.dxf', 'application/dxf')
   }
 
   return (
@@ -162,11 +160,12 @@ export function RightPanel({
               <button className="btn-primary wide" onClick={onScreenshot}>Copia screenshot</button>
             </section>
             <section>
-              <h4>File</h4>
-              <p className="muted">DXF e SVG sono adatti al taglio laser e all'importazione in CAD.</p>
-              <button className="btn-secondary wide" onClick={() => handleExport('svg')}>Esporta SVG</button>
-              <button className="btn-secondary wide" onClick={() => handleExport('dxf')}>Esporta DXF (2D)</button>
-              <button className="btn-secondary wide" onClick={() => handleExport('stl')}>Esporta STL (3D)</button>
+              <h4>DXF per CAD</h4>
+              <p className="muted">
+                Tutto il disegno in millimetri, un layer per tipo (profili, bulloni, cavi, quote, testi…) con i colori della tela.
+                Immagini e riempimenti non vengono esportati.
+              </p>
+              <button className="btn-secondary wide" onClick={handleExport}>Esporta DXF</button>
             </section>
           </div>
         )}

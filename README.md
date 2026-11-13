@@ -71,7 +71,8 @@ src/
   style.ts             palette e stile corrente
   hooks/useHistory.ts  annulla/ripeti
   utils/project.ts     salvataggio su file e autosalvataggio
-  utils/export.ts      export SVG / DXF / STL
+  utils/export.ts      export DXF (R12, layer per tipo, colori ACI)
+  utils/pathToPolylines.ts  tracciati SVG → polilinee (archi e curve suddivisi)
   profiles.ts          catalogo profili: caricamento, ricerca, compatibilità con i nomi dei vecchi disegni
   data/profiles.json   database profili Maffeis (generato dal CSV, vedi sotto)
   beamPath.ts          geometria delle sezioni (I, U, L, T, tubolari) e viste laterali

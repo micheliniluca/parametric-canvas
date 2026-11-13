@@ -149,8 +149,9 @@ export const getSnapPoint = (
   world: Point,
   gridSize: number,
   threshold: number,
-  excludeId?: string,
+  exclude?: string | Set<string>,
 ): Point => {
+  const skip = (id: string) => (typeof exclude === 'string' ? id === exclude : !!exclude?.has(id))
   const candidates: Point[] = []
   let nearestEdge: Point | null = null
   let minEdge = threshold
@@ -179,7 +180,7 @@ export const getSnapPoint = (
   }
 
   for (const o of objects) {
-    if (o.id === excludeId) continue
+    if (skip(o.id)) continue
     const center = getObjectCenter(o)
     const rot = o.rotation || 0
     const r = (p: Point) => rotatePoint(p, center, rot)
@@ -212,4 +213,103 @@ export const getSnapPoint = (
   const g = { x: Math.round(world.x / gridSize) * gridSize, y: Math.round(world.y / gridSize) * gridSize }
   if (dist(g, world) < threshold) return g
   return world
+}
+
+/** Ingombro in coordinate mondo tenendo conto della rotazione */
+export const worldBounds = (o: CanvasObject) => {
+  const b = getObjectBounds(o)
+  const rot = o.rotation || 0
+  if (!rot) return { minX: b.x, minY: b.y, maxX: b.x + b.w, maxY: b.y + b.h }
+  const c = getObjectCenter(o)
+  const pts = [
+    { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h },
+  ].map(p => rotatePoint(p, c, rot))
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y)
+  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
+}
+
+export type Box = { minX: number; minY: number; maxX: number; maxY: number }
+
+export const unionBounds = (objs: CanvasObject[]): Box | null => {
+  if (!objs.length) return null
+  return objs.map(worldBounds).reduce((a, b) => ({
+    minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY),
+  }))
+}
+
+/** Ruota un oggetto attorno a un punto esterno (rotazione di gruppo) */
+export const rotateObjectAround = (o: CanvasObject, center: Point, deg: number): CanvasObject => {
+  if (!deg) return o
+  const rp = (p: Point) => rotatePoint(p, center, deg)
+  if (o.type === 'arrow' || o.type === 'quote') {
+    const p1 = rp({ x: o.x1, y: o.y1 })
+    const p2 = rp({ x: o.x2, y: o.y2 })
+    return { ...o, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
+  }
+  if (o.type === 'polyline') return { ...o, points: o.points.map(rp) }
+  // gli altri ruotano attorno al proprio centro: si sposta il centro e si somma l'angolo
+  const c = getObjectCenter(o)
+  const nc = rp(c)
+  const moved = translateObject(o, nc.x - c.x, nc.y - c.y)
+  const rot = ((((o.rotation || 0) + deg) % 360) + 540) % 360 - 180
+  return { ...moved, rotation: rot }
+}
+
+/** Aggiunge alla lista tutti i membri dei gruppi coinvolti */
+export const expandGroups = (objects: CanvasObject[], ids: string[]): string[] => {
+  const groups = new Set(objects.filter(o => ids.includes(o.id) && o.groupId).map(o => o.groupId))
+  if (!groups.size) return ids
+  const out = new Set(ids)
+  for (const o of objects) if (o.groupId && groups.has(o.groupId)) out.add(o.id)
+  return [...out]
+}
+
+export type AlignKind = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'hdistribute' | 'vdistribute'
+
+/** Allinea o distribuisce gli oggetti (i gruppi si muovono come un blocco) */
+export const alignObjects = (objects: CanvasObject[], ids: string[], kind: AlignKind): CanvasObject[] => {
+  const sel = objects.filter(o => ids.includes(o.id) && !o.locked)
+  // unità da allineare: ogni gruppo è un blocco unico, gli altri oggetti sono singoli
+  const units = new Map<string, CanvasObject[]>()
+  for (const o of sel) {
+    const k = o.groupId ?? o.id
+    units.set(k, [...(units.get(k) ?? []), o])
+  }
+  const list = [...units.values()].map(objs => ({ objs, b: unionBounds(objs)! }))
+  if (list.length < 2) return objects
+  const all = unionBounds(sel)!
+  const shift = new Map<string, Point>()
+  const set = (objs: CanvasObject[], dx: number, dy: number) => objs.forEach(o => shift.set(o.id, { x: dx, y: dy }))
+
+  if (kind === 'hdistribute' || kind === 'vdistribute') {
+    const h = kind === 'hdistribute'
+    const sorted = [...list].sort((a, b) => (h ? a.b.minX - b.b.minX : a.b.minY - b.b.minY))
+    const size = (u: typeof list[number]) => (h ? u.b.maxX - u.b.minX : u.b.maxY - u.b.minY)
+    const span = h ? all.maxX - all.minX : all.maxY - all.minY
+    const gap = (span - sorted.reduce((t, u) => t + size(u), 0)) / (sorted.length - 1)
+    let pos = h ? all.minX : all.minY
+    for (const u of sorted) {
+      const d = pos - (h ? u.b.minX : u.b.minY)
+      set(u.objs, h ? d : 0, h ? 0 : d)
+      pos += size(u) + gap
+    }
+  } else {
+    for (const u of list) {
+      const { b } = u
+      const dx =
+        kind === 'left' ? all.minX - b.minX :
+        kind === 'right' ? all.maxX - b.maxX :
+        kind === 'hcenter' ? (all.minX + all.maxX) / 2 - (b.minX + b.maxX) / 2 : 0
+      const dy =
+        kind === 'top' ? all.minY - b.minY :
+        kind === 'bottom' ? all.maxY - b.maxY :
+        kind === 'vcenter' ? (all.minY + all.maxY) / 2 - (b.minY + b.maxY) / 2 : 0
+      set(u.objs, dx, dy)
+    }
+  }
+  return objects.map(o => {
+    const d = shift.get(o.id)
+    return d && (d.x || d.y) ? translateObject(o, d.x, d.y) : o
+  })
 }

@@ -53,7 +53,7 @@ export type ToolDef = {
 }
 
 export const TOOLS: Record<ToolId, ToolDef> = {
-  select: { id: 'select', label: 'Seleziona', icon: MousePointer2, shortcut: 'V', hint: 'Clic per selezionare, trascina lo sfondo per spostare la vista' },
+  select: { id: 'select', label: 'Seleziona', icon: MousePointer2, shortcut: 'V', hint: 'Clic seleziona · Ctrl+clic aggiunge/toglie · trascina per il riquadro (→ dentro, ← toccati) · tasto centrale sposta la vista' },
   line: { id: 'line', label: 'Linea', icon: Minus, shortcut: 'L', hint: 'Trascina per disegnare una linea (Shift = ortogonale)' },
   polyline: { id: 'polyline', label: 'Polilinea', icon: Activity, shortcut: 'P', hint: 'Clic per aggiungere vertici · clic sul primo punto per chiudere · doppio clic o Invio per terminare' },
   freehand: { id: 'freehand', label: 'Mano libera', icon: PenTool, shortcut: 'D', sticky: true, hint: 'Trascina per disegnare. Esc per terminare' },

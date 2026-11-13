@@ -8,10 +8,10 @@ import { dashArray } from './style'
 import { round1 } from './utils/mathUtils'
 import {
   applyOrtho, dist, getObjectBounds, getObjectCenter, getSnapPoint,
-  rotatePoint, scaleObject, translateObject,
+  rotatePoint, scaleObject, translateObject, worldBounds, expandGroups, rotateObjectAround,
 } from './canvas/geometry'
 import { ObjectView } from './canvas/ObjectView'
-import { SelectionOverlay } from './canvas/SelectionOverlay'
+import { MultiSelectionOverlay, SelectionOverlay } from './canvas/SelectionOverlay'
 import type { Corner, Grip } from './canvas/SelectionOverlay'
 import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
 import { TextEditor } from './canvas/TextEditor'
@@ -26,8 +26,8 @@ const ACCENT = '#6366f1'
 type Props = {
   objects: CanvasObject[]
   setObjects: Dispatch<SetStateAction<CanvasObject[]>>
-  selectedId: string | null
-  setSelectedId: (id: string | null) => void
+  selectedIds: string[]
+  setSelectedIds: (ids: string[]) => void
   view: Point
   setView: Dispatch<SetStateAction<Point>>
   zoom: number
@@ -51,7 +51,9 @@ type Props = {
 /** Interazione col puntatore in corso (una sola alla volta) */
 type Interaction =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; id: string; sx: number; sy: number; startWorld: Point; start: CanvasObject; moved: boolean }
+  | { kind: 'move'; ids: Set<string>; sx: number; sy: number; startWorld: Point; starts: CanvasObject[]; moved: boolean }
+  | { kind: 'marquee'; sx: number; sy: number; start: Point; additive: boolean; clickId?: string }
+  | { kind: 'rotateMulti'; cx: number; cy: number; startAngle: number; starts: CanvasObject[] }
   | { kind: 'resize'; id: string; corner: Corner; start: CanvasObject }
   | { kind: 'vertex'; id: string; index: number }
   | { kind: 'end'; id: string; end: 'p1' | 'p2' }
@@ -63,7 +65,7 @@ type Interaction =
 type Segment = { p1: Point; p2: Point }
 
 export function Canvas({
-  objects, setObjects, selectedId, setSelectedId,
+  objects, setObjects, selectedIds, setSelectedIds,
   view, setView, zoom, setZoom,
   gridSize, showGrid, snapEnabled, orthoEnabled,
   tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode, nextBubbleNumber, onBubblePlaced,
@@ -86,7 +88,13 @@ export function Canvas({
   /** Oggetto da scalare con lo strumento "scala con due punti" */
   const [scaleTargetId, setScaleTargetId] = useState<string | null>(null)
 
+  /** Selezione singola (maniglie, strumenti immagine); con più oggetti è null */
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
+  const setSelectedId = (id: string | null) => setSelectedIds(id ? [id] : [])
   const selected = objects.find(o => o.id === selectedId) ?? null
+  const selectedObjs = selectedIds.length > 1 ? objects.filter(o => selectedIds.includes(o.id)) : []
+  /** Riquadro di selezione in corso */
+  const [marquee, setMarquee] = useState<{ a: Point; b: Point } | null>(null)
 
   // Cambiando strumento si azzerano le bozze
   useEffect(() => {
@@ -184,15 +192,39 @@ export function Canvas({
       return
     }
 
-    setSelectedId(o.id)
-    if (o.locked) {
-      // oggetto bloccato: si seleziona ma trascinandolo si sposta la vista
-      action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
+    // Alt+clic: solo l'oggetto, anche se fa parte di un gruppo
+    const ids = e.altKey ? [o.id] : expandGroups(objects, [o.id])
+
+    // Ctrl+clic: aggiunge o toglie dalla selezione
+    if (e.ctrlKey || e.metaKey) {
+      const allIn = ids.every(id => selectedIds.includes(id))
+      setSelectedIds(allIn ? selectedIds.filter(id => !ids.includes(id)) : [...new Set([...selectedIds, ...ids])])
       return
     }
+
+    if (o.locked) {
+      // oggetto bloccato (es. screenshot di sfondo): trascinando si traccia un riquadro, con un clic si seleziona
+      action.current = { kind: 'marquee', sx: e.clientX, sy: e.clientY, start: toWorld(e), additive: false, clickId: o.id }
+      return
+    }
+
+    // clic su un oggetto già selezionato: si sposta tutta la selezione
+    const sel = !e.altKey && selectedIds.includes(o.id) ? selectedIds : ids
+    if (sel !== selectedIds) setSelectedIds(sel)
+    const starts = objects.filter(x => sel.includes(x.id) && !x.locked)
     action.current = {
-      kind: 'move', id: o.id, sx: e.clientX, sy: e.clientY,
-      startWorld: toWorld(e), start: o, moved: false,
+      kind: 'move', ids: new Set(starts.map(x => x.id)), sx: e.clientX, sy: e.clientY,
+      startWorld: toWorld(e), starts, moved: false,
+    }
+  }
+
+  /** Rotazione di più oggetti attorno al centro della selezione */
+  const onMultiRotate = (e: ReactMouseEvent, center: Point) => {
+    const w = toWorld(e)
+    action.current = {
+      kind: 'rotateMulti', cx: center.x, cy: center.y,
+      startAngle: (Math.atan2(w.y - center.y, w.x - center.x) * 180) / Math.PI,
+      starts: selectedObjs.filter(o => !o.locked),
     }
   }
 
@@ -371,10 +403,12 @@ export function Canvas({
         setCropPoints(prev => [...(prev ?? []), { x: w.x - selected.x, y: w.y - selected.y }])
         return
       }
+      case 'select':
+        // trascinando si traccia il riquadro di selezione; un clic sul vuoto deseleziona
+        action.current = { kind: 'marquee', sx: e.clientX, sy: e.clientY, start: toWorld(e), additive: e.ctrlKey || e.metaKey }
+        return
       default:
-        // select / wand: clic sullo sfondo deseleziona e sposta la vista
-        setSelectedId(null)
-        action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
+        return
     }
   }
 
@@ -476,16 +510,30 @@ export function Canvas({
       case 'move': {
         if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < DRAG_THRESHOLD_PX) return
         a.moved = true
-        // si aggancia il punto di presa, poi si trasla l'oggetto della stessa quantità
-        const raw = w
-        const snapped = snapOn(e) ? getSnapPoint(objects, raw, gridSize, SNAP_PX / zoom, a.id) : raw
+        // si aggancia il punto di presa, poi si traslano gli oggetti della stessa quantità
+        const snapped = snapOn(e) ? getSnapPoint(objects, w, gridSize, SNAP_PX / zoom, a.ids) : w
         let dx = snapped.x - a.startWorld.x
         let dy = snapped.y - a.startWorld.y
         if (orthoOn(e)) {
           if (Math.abs(dx) > Math.abs(dy)) dy = 0
           else dx = 0
         }
-        updateObject(a.id, () => translateObject(a.start, dx, dy))
+        const moved = new Map(a.starts.map(o => [o.id, translateObject(o, dx, dy)]))
+        setObjects(objs => objs.map(o => moved.get(o.id) ?? o))
+        return
+      }
+
+      case 'marquee':
+        if (Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < DRAG_THRESHOLD_PX) return
+        setMarquee({ a: a.start, b: w })
+        return
+
+      case 'rotateMulti': {
+        let deg = (Math.atan2(w.y - a.cy, w.x - a.cx) * 180) / Math.PI - a.startAngle
+        if (e.shiftKey) deg = Math.round(deg / 15) * 15
+        const c = { x: a.cx, y: a.cy }
+        const rotated = new Map(a.starts.map(o => [o.id, rotateObjectAround(o, c, deg)]))
+        setObjects(objs => objs.map(o => rotated.get(o.id) ?? o))
         return
       }
 
@@ -530,10 +578,38 @@ export function Canvas({
     }
   }
 
-  const onMouseUp = () => {
+  const onMouseUp = (e: { clientX: number; clientY: number }) => {
     const a = action.current
     action.current = null
     if (!a) return
+
+    if (a.kind === 'marquee') {
+      setMarquee(null)
+      const dragged = Math.hypot(e.clientX - a.sx, e.clientY - a.sy) >= DRAG_THRESHOLD_PX
+      if (!dragged) {
+        // semplice clic: sull'oggetto bloccato lo seleziona, sul vuoto deseleziona
+        if (a.clickId) setSelectedIds(expandGroups(objects, [a.clickId]))
+        else if (!a.additive) setSelectedIds([])
+        return
+      }
+      const end = toWorld(e)
+      const box = {
+        minX: Math.min(a.start.x, end.x), maxX: Math.max(a.start.x, end.x),
+        minY: Math.min(a.start.y, end.y), maxY: Math.max(a.start.y, end.y),
+      }
+      // da sinistra a destra: solo oggetti interamente dentro; da destra a sinistra: anche quelli toccati
+      const crossing = end.x < a.start.x
+      const hits = objects.filter(o => {
+        if (o.locked) return false
+        const b = worldBounds(o)
+        return crossing
+          ? b.minX <= box.maxX && b.maxX >= box.minX && b.minY <= box.maxY && b.maxY >= box.minY
+          : b.minX >= box.minX && b.maxX <= box.maxX && b.minY >= box.minY && b.maxY <= box.maxY
+      }).map(o => o.id)
+      const ids = expandGroups(objects, hits)
+      setSelectedIds(a.additive ? [...new Set([...selectedIds, ...ids])] : ids)
+      return
+    }
 
     if (a.kind === 'segment' && segment) {
       const { p1, p2 } = segment
@@ -576,6 +652,15 @@ export function Canvas({
     }
   }
 
+  // rilascio fuori dalla tela (o sopra la barra stili) mentre si traccia il riquadro
+  const mouseUpRef = useRef(onMouseUp)
+  mouseUpRef.current = onMouseUp
+  useEffect(() => {
+    const up = (e: MouseEvent) => { if (action.current?.kind === 'marquee') mouseUpRef.current(e) }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
+
   /* ---------- rendering ---------- */
 
   const interactiveObjects = tool === 'select' || tool === 'wand'
@@ -601,7 +686,7 @@ export function Canvas({
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
+        onMouseLeave={e => { if (action.current?.kind !== 'marquee') onMouseUp(e) }}
         onWheel={onWheel}
         onContextMenu={e => e.preventDefault()}
       >
@@ -643,6 +728,22 @@ export function Canvas({
 
           <g id="ui-layer">
             {selected && tool === 'select' && selected.id !== editingId && <SelectionOverlay o={selected} zoom={zoom} onGrip={onGrip} />}
+            {selectedObjs.length > 1 && tool === 'select' && (
+              <MultiSelectionOverlay objs={selectedObjs} zoom={zoom} onRotateStart={onMultiRotate} />
+            )}
+            {marquee && (() => {
+              const crossing = marquee.b.x < marquee.a.x
+              return (
+                <rect
+                  x={Math.min(marquee.a.x, marquee.b.x)} y={Math.min(marquee.a.y, marquee.b.y)}
+                  width={Math.abs(marquee.b.x - marquee.a.x)} height={Math.abs(marquee.b.y - marquee.a.y)}
+                  fill={crossing ? 'rgba(22, 163, 74, 0.08)' : 'rgba(99, 102, 241, 0.08)'}
+                  stroke={crossing ? '#16a34a' : ACCENT} strokeWidth={1 * k}
+                  strokeDasharray={crossing ? `${5 * k} ${3 * k}` : undefined}
+                  pointerEvents="none"
+                />
+              )
+            })()}
 
             {/* immagine in scontorno/bacchetta: evidenzia */}
             {selected && (tool === 'crop' || tool === 'wand' || (tool === 'scale' && scaleTargetId)) && (() => {

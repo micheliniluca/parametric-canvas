@@ -9,10 +9,21 @@ import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './
 import { exportToDXF, exportToSTL, exportToSVG } from './utils/export'
 import { downloadText } from './utils/project'
 import { round1 } from './utils/mathUtils'
-import { Database, Download, SlidersHorizontal, MousePointerClick } from 'lucide-react'
+import {
+  Database, Download, SlidersHorizontal, MousePointerClick,
+  AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+  AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
+} from 'lucide-react'
+import type { AlignKind } from './canvas/geometry'
 
 type Props = {
   selected: CanvasObject | null
+  /** Tutti gli oggetti selezionati (anche uno solo) */
+  selectedObjs: CanvasObject[]
+  onAlign: (kind: AlignKind) => void
+  onGroup: () => void
+  onUngroup: () => void
   objects: CanvasObject[]
   onChange: (patch: Partial<CanvasObject>) => void
   onAddObject: (obj: CanvasObject) => void
@@ -84,7 +95,7 @@ function Num({ value, onChange, min, step }: { value: number; onChange: (v: numb
 /** Pannello laterale: proprietà dell'oggetto selezionato, catalogo profili ed esportazione */
 export function RightPanel({
   selected, objects, onChange, screenshotMode, setScreenshotMode, onScreenshot,
-  tab, setTab, placingProfileCode, onPickProfile,
+  tab, setTab, placingProfileCode, onPickProfile, selectedObjs, onAlign, onGroup, onUngroup,
 }: Props) {
   const placing = placingProfileCode ? findProfile(placingProfileCode) : undefined
 
@@ -157,7 +168,11 @@ export function RightPanel({
           </div>
         )}
 
-        {tab === 'props' && !selected && (
+        {tab === 'props' && selectedObjs.length > 1 && (
+          <MultiProps objs={selectedObjs} onAlign={onAlign} onGroup={onGroup} onUngroup={onUngroup} />
+        )}
+
+        {tab === 'props' && selectedObjs.length === 0 && (
           <div className="no-selection">
             <MousePointerClick size={40} strokeWidth={1.25} />
             <p>Seleziona un oggetto per modificarne le proprietà.</p>
@@ -189,6 +204,80 @@ function ProfileHeader({ code, length }: { code: string; length: number }) {
       <div className="muted">
         {p.h} × {p.b} · tw {p.tw} · tf {p.tf}{p.r ? ` · r ${p.r}` : ''}
         {p.g ? <> · <b>{p.g} kg/m</b>{length > 0 ? ` · ${round1((p.g * length) / 1000)} kg su ${round1(length)} mm` : ''}</> : null}
+      </div>
+    </div>
+  )
+}
+
+/** Più oggetti selezionati: riepilogo, gruppi, allinea e distribuisci */
+function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
+  objs: CanvasObject[]
+  onAlign: (kind: AlignKind) => void
+  onGroup: () => void
+  onUngroup: () => void
+}) {
+  useCatalog()
+  const counts = new Map<string, number>()
+  for (const o of objs) {
+    const label = o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]
+    counts.set(label, (counts.get(label) ?? 0) + 1)
+  }
+  // peso dei profili in vista laterale o dall'alto (la sezione non ha lunghezza)
+  let weight = 0
+  let weighed = 0
+  for (const o of objs) {
+    if (o.type !== 'profile' || o.viewType === 'front') continue
+    const g = findProfile(o.profileName)?.g
+    if (g) { weight += (g * o.length) / 1000; weighed++ }
+  }
+  const groupIds = new Set(objs.map(o => o.groupId).filter(Boolean))
+  const singleGroup = groupIds.size === 1 && objs.every(o => o.groupId)
+  const locked = objs.filter(o => o.locked).length
+  const btn = (kind: AlignKind, title: string, icon: ReactNode, disabled = false) => (
+    <button type="button" className="align-btn" title={title} aria-label={title} onClick={() => onAlign(kind)} disabled={disabled}>{icon}</button>
+  )
+  const units = new Set(objs.filter(o => !o.locked).map(o => o.groupId ?? o.id)).size
+
+  return (
+    <div className="properties-form">
+      <div className="object-info">
+        <span className="badge">{singleGroup ? 'Gruppo' : 'Selezione multipla'}</span>
+        <span className="muted">{objs.length} oggetti</span>
+      </div>
+      <div className="multi-summary">
+        {[...counts].map(([label, n]) => <span key={label}>{n} × {label}</span>)}
+      </div>
+      {weighed > 0 && (
+        <p className="muted" style={{ margin: 0 }}>Peso profili (viste laterali/dall'alto): <b>{round1(weight)} kg</b></p>
+      )}
+      {locked > 0 && <p className="muted" style={{ margin: 0 }}>{locked} bloccati: non si spostano.</p>}
+
+      <h4>Gruppo</h4>
+      <div className="multi-actions">
+        {singleGroup
+          ? <button type="button" className="btn-secondary" onClick={onUngroup}>Separa gruppo (Ctrl+Shift+G)</button>
+          : <button type="button" className="btn-secondary" onClick={onGroup}>Raggruppa (Ctrl+G)</button>}
+        {!singleGroup && groupIds.size > 0 && (
+          <button type="button" className="btn-secondary" onClick={onUngroup}>Separa i gruppi</button>
+        )}
+      </div>
+      <p className="muted" style={{ margin: 0 }}>Alt+clic seleziona un solo oggetto dentro un gruppo.</p>
+
+      <h4>Allinea</h4>
+      <div className="align-row">
+        {btn('left', 'Allinea a sinistra', <AlignStartVertical size={18} />, units < 2)}
+        {btn('hcenter', 'Centra orizzontalmente', <AlignCenterVertical size={18} />, units < 2)}
+        {btn('right', 'Allinea a destra', <AlignEndVertical size={18} />, units < 2)}
+        <span className="align-sep" />
+        {btn('top', 'Allinea in alto', <AlignStartHorizontal size={18} />, units < 2)}
+        {btn('vcenter', 'Centra verticalmente', <AlignCenterHorizontal size={18} />, units < 2)}
+        {btn('bottom', 'Allinea in basso', <AlignEndHorizontal size={18} />, units < 2)}
+      </div>
+      <h4>Distribuisci</h4>
+      <div className="align-row">
+        {btn('hdistribute', 'Distribuisci in orizzontale (spazi uguali)', <AlignHorizontalDistributeCenter size={18} />, units < 3)}
+        {btn('vdistribute', 'Distribuisci in verticale (spazi uguali)', <AlignVerticalDistributeCenter size={18} />, units < 3)}
+        {units < 3 && <span className="muted">servono almeno 3 elementi</span>}
       </div>
     </div>
   )

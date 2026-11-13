@@ -21,6 +21,11 @@ npm run dev
 | Tasto | Azione |
 |---|---|
 | V | Seleziona |
+| Ctrl+clic | Aggiunge o toglie un oggetto dalla selezione |
+| Trascina sulla tela | Riquadro di selezione: verso destra seleziona gli oggetti interamente dentro, verso sinistra anche quelli toccati |
+| Ctrl+A | Seleziona tutto (esclusi gli oggetti bloccati) |
+| Ctrl+G / Ctrl+Shift+G | Raggruppa / separa il gruppo |
+| Alt+clic | Seleziona un solo oggetto dentro un gruppo |
 | D | Mano libera (resta attiva, Esc per uscire) |
 | L / P / A | Linea / Polilinea / Freccia |
 | R / C | Rettangolo / Cerchio (trascina; Shift = quadrato) |
@@ -40,9 +45,13 @@ npm run dev
 | Frecce (Shift) | Sposta di 1 (10) |
 | Canc | Elimina |
 | Esc | Torna alla selezione |
-| Tasto centrale / trascina sfondo | Sposta la vista |
+| Tasto centrale | Sposta la vista |
 
 Il disegno viene salvato automaticamente nel browser (IndexedDB) e ripristinato alla riapertura.
+Con più oggetti selezionati il pannello mostra il riepilogo, i comandi di gruppo e allinea / distribuisci.
+
+Per fare prove senza toccare il disegno salvato si può aprire l'app con `?sandbox` nell'indirizzo
+(es. `http://localhost:5173/?sandbox`): usa un autosalvataggio separato.
 
 ## Struttura del codice
 

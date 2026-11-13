@@ -1,6 +1,7 @@
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { CanvasObject } from '../types'
-import { getObjectBounds, getObjectCenter, rotatePoint, textSize } from './geometry'
+import { getObjectBounds, getObjectCenter, rotatePoint, textSize, unionBounds, worldBounds } from './geometry'
+import type { Point } from '../types'
 import { round1 } from '../utils/mathUtils'
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br'
@@ -132,6 +133,51 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
           {label}
         </text>
       )}
+    </g>
+  )
+}
+
+/** Più oggetti selezionati: contorno di ciascuno, riquadro complessivo e maniglia di rotazione */
+export function MultiSelectionOverlay({ objs, zoom, onRotateStart }: {
+  objs: CanvasObject[]
+  zoom: number
+  onRotateStart: (e: ReactMouseEvent, center: Point) => void
+}) {
+  const k = 1 / zoom
+  const u = unionBounds(objs)
+  if (!u) return null
+  const pad = 6 * k
+  const c = { x: (u.minX + u.maxX) / 2, y: (u.minY + u.maxY) / 2 }
+  const hy = u.minY - pad - 26 * k
+  const allLocked = objs.every(o => o.locked)
+  return (
+    <g>
+      {objs.map(o => {
+        const b = worldBounds(o)
+        return (
+          <rect key={o.id} x={b.minX} y={b.minY} width={b.maxX - b.minX} height={b.maxY - b.minY}
+            fill="none" stroke={o.locked ? '#94a3b8' : ACCENT} strokeOpacity={0.55} strokeWidth={1 * k} pointerEvents="none" />
+        )
+      })}
+      <rect
+        x={u.minX - pad} y={u.minY - pad} width={u.maxX - u.minX + pad * 2} height={u.maxY - u.minY + pad * 2}
+        fill="none" stroke={ACCENT} strokeWidth={1 * k} strokeDasharray={`${4 * k} ${3 * k}`} pointerEvents="none"
+      />
+      {!allLocked && (
+        <>
+          <line x1={c.x} y1={u.minY - pad} x2={c.x} y2={hy} stroke={ACCENT} strokeOpacity={0.35} strokeWidth={1 * k} pointerEvents="none" />
+          <circle
+            cx={c.x} cy={hy} r={6 * k} fill="white" stroke={ACCENT} strokeWidth={2 * k} style={{ cursor: 'grab' }}
+            onMouseDown={e => { e.stopPropagation(); onRotateStart(e, c) }}
+          >
+            <title>Ruota la selezione (Shift = passi di 15°)</title>
+          </circle>
+        </>
+      )}
+      <text x={c.x} y={u.maxY + pad + 16 * k} fontSize={11 * k} fill={ACCENT} textAnchor="middle"
+        pointerEvents="none" style={{ userSelect: 'none' }}>
+        {objs.length} oggetti
+      </text>
     </g>
   )
 }

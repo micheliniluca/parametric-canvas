@@ -3,7 +3,10 @@ import type { DrawStyle } from '../style'
 import { migrateObjects } from './boltUtils'
 
 export const PROJECT_VERSION = 1
-const AUTOSAVE_KEY = 'parametric-canvas:autosave'
+// con "?sandbox" nell'indirizzo si usa un autosalvataggio separato (prove senza toccare il disegno reale)
+const AUTOSAVE_KEY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('sandbox')
+  ? 'parametric-canvas:autosave:sandbox'
+  : 'parametric-canvas:autosave'
 
 export type ProjectFile = {
   app: 'parametric-canvas'

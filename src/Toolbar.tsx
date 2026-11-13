@@ -4,7 +4,7 @@ import type { ToolId } from './tools'
 import { TOOLS } from './tools'
 import {
   Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
-  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose,
+  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup,
 } from 'lucide-react'
 
 
@@ -26,6 +26,13 @@ type Props = {
   onDelete: () => void
   onPaste: () => void
   onToggleLock: () => void
+  /** Numero di oggetti selezionati */
+  selectionCount: number
+  allLocked: boolean
+  /** Nella selezione c'è almeno un gruppo */
+  grouped: boolean
+  onGroup: () => void
+  onUngroup: () => void
   panelOpen: boolean
   togglePanel: () => void
 }
@@ -66,7 +73,7 @@ export function Toolbar(p: Props) {
     )
   }
 
-  const has = !!p.selected
+  const has = p.selectionCount > 0
 
   return (
     <header className="toolbar">
@@ -105,16 +112,21 @@ export function Toolbar(p: Props) {
       </div>
 
       <div className="tb-group">
+        {p.grouped ? (
+          <Btn title="Separa il gruppo (Ctrl+Shift+G)" onClick={p.onUngroup}><Ungroup size={18} /></Btn>
+        ) : (
+          <Btn title="Raggruppa (Ctrl+G) — seleziona almeno due oggetti" onClick={p.onGroup} disabled={p.selectionCount < 2}><Group size={18} /></Btn>
+        )}
         <Btn
-          title={p.selected?.locked ? 'Sblocca (Ctrl+L)' : 'Blocca: non si sposta né si elimina (Ctrl+L)'}
-          onClick={p.onToggleLock} disabled={!has} active={!!p.selected?.locked}
+          title={p.allLocked ? 'Sblocca (Ctrl+L)' : 'Blocca: non si sposta né si elimina (Ctrl+L)'}
+          onClick={p.onToggleLock} disabled={!has} active={p.allLocked}
         >
-          {p.selected?.locked ? <Lock size={18} /> : <LockOpen size={18} />}
+          {p.allLocked ? <Lock size={18} /> : <LockOpen size={18} />}
         </Btn>
         <Btn title="Duplica (Ctrl+D)" onClick={p.onDuplicate} disabled={!has}><Copy size={18} /></Btn>
         <Btn title="Porta in primo piano (Ctrl+])" onClick={p.onBringToFront} disabled={!has}><ChevronsUp size={18} /></Btn>
         <Btn title="Manda in fondo (Ctrl+[)" onClick={p.onSendToBack} disabled={!has}><ChevronsDown size={18} /></Btn>
-        <Btn title="Elimina (Canc)" onClick={p.onDelete} disabled={!has || !!p.selected?.locked}><Trash2 size={18} /></Btn>
+        <Btn title="Elimina (Canc)" onClick={p.onDelete} disabled={!has || p.allLocked}><Trash2 size={18} /></Btn>
         <Sep />
         <button className="tb-primary" onClick={p.onScreenshot} title="Copia la vista negli appunti come immagine">
           <Camera size={16} />

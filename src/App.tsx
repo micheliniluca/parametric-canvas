@@ -11,7 +11,8 @@ import { StatusBar } from './StatusBar'
 import { useHistory } from './hooks/useHistory'
 import type { DrawStyle } from './style'
 import { DEFAULT_STYLE, stylePatchFor } from './style'
-import { getObjectBounds, translateObject } from './canvas/geometry'
+import { alignObjects, getObjectBounds, translateObject } from './canvas/geometry'
+import type { AlignKind } from './canvas/geometry'
 import { captureSvgToClipboard } from './utils/capture'
 import { migrateObjects } from './utils/boltUtils'
 import { DEFAULT_PROFILE_CODE, loadCatalog, useCatalog } from './profiles'
@@ -31,7 +32,10 @@ export default function App() {
   const objects = history.state
   const setObjects = history.setState
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  /** Oggetti selezionati (più di uno con Ctrl+clic, riquadro o Ctrl+A) */
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
+  const setSelectedId = useCallback((id: string | null) => setSelectedIds(id ? [id] : []), [])
   const [tool, setToolRaw] = useState<ToolId>('select')
   const [view, setView] = useState<Point>({ x: -100, y: -100 })
   const [zoom, setZoom] = useState(1)
@@ -52,6 +56,7 @@ export default function App() {
   const viewportRef = useRef<HTMLDivElement>(null)
 
   const selected = objects.find(o => o.id === selectedId) ?? null
+  const selectedObjs = objects.filter(o => selectedIds.includes(o.id))
 
   const notify = useCallback((msg: string) => {
     setToast(msg)
@@ -191,44 +196,83 @@ export default function App() {
     setObjects(objs => objs.map(o => (o.id === selectedId ? ({ ...o, ...patch } as CanvasObject) : o)))
   }
 
+  /** Applica una trasformazione a tutti gli oggetti selezionati */
+  const updateMany = (fn: (o: CanvasObject) => CanvasObject) =>
+    setObjects(objs => objs.map(o => (selectedIds.includes(o.id) ? fn(o) : o)))
+
   const onStyleChange = (patch: Partial<DrawStyle>) => {
     setDrawStyle(s => ({ ...s, ...patch }))
-    if (selected) updateSelected(stylePatchFor(selected, patch))
+    updateMany(o => ({ ...o, ...stylePatchFor(o, patch) }) as CanvasObject)
   }
 
   const toggleLock = () => {
-    if (!selected) return
-    updateSelected({ locked: !selected.locked })
-    notify(selected.locked ? 'Oggetto sbloccato' : 'Oggetto bloccato: non si sposta né si elimina')
+    if (!selectedObjs.length) return
+    const lock = !selectedObjs.every(o => o.locked)
+    updateMany(o => ({ ...o, locked: lock }))
+    notify(lock ? 'Bloccato: non si sposta né si elimina' : 'Sbloccato')
   }
 
   const deleteSelected = () => {
-    if (!selectedId) return
-    if (selected?.locked) {
+    if (!selectedObjs.length) return
+    const removable = selectedObjs.filter(o => !o.locked).map(o => o.id)
+    if (!removable.length) {
       notify('Oggetto bloccato: sbloccalo per eliminarlo')
       return
     }
-    setObjects(objs => objs.filter(o => o.id !== selectedId))
-    setSelectedId(null)
+    setObjects(objs => objs.filter(o => !removable.includes(o.id)))
+    setSelectedIds([])
+    if (removable.length < selectedObjs.length) notify('Gli oggetti bloccati non sono stati eliminati')
   }
 
   const pasteObjects = (items: CanvasObject[], offset = 20) => {
-    const copies = items.map(o => ({ ...translateObject(o, offset, offset), id: crypto.randomUUID() }) as CanvasObject)
+    // ogni gruppo incollato riceve un nuovo identificativo, distinto dall'originale
+    const groupMap = new Map<string, string>()
+    const copies = items.map(o => {
+      const c = { ...translateObject(o, offset, offset), id: crypto.randomUUID() } as CanvasObject
+      if (o.groupId) {
+        if (!groupMap.has(o.groupId)) groupMap.set(o.groupId, crypto.randomUUID())
+        c.groupId = groupMap.get(o.groupId)
+      }
+      return c
+    })
     setObjects(prev => [...prev, ...copies])
-    if (copies.length) setSelectedId(copies[copies.length - 1].id)
+    setSelectedIds(copies.map(c => c.id))
   }
 
-  const duplicate = () => { if (selected) pasteObjects([selected]) }
+  const duplicate = () => { if (selectedObjs.length) pasteObjects(selectedObjs) }
 
+  /** Porta in primo piano o in fondo mantenendo l'ordine relativo degli oggetti selezionati */
   const reorder = (toFront: boolean) => {
-    if (!selectedId) return
+    if (!selectedIds.length) return
     setObjects(objs => {
-      const o = objs.find(x => x.id === selectedId)
-      if (!o) return objs
-      const rest = objs.filter(x => x.id !== selectedId)
-      return toFront ? [...rest, o] : [o, ...rest]
+      const sel = objs.filter(x => selectedIds.includes(x.id))
+      const rest = objs.filter(x => !selectedIds.includes(x.id))
+      return toFront ? [...rest, ...sel] : [...sel, ...rest]
     })
   }
+
+  const selectAll = () => {
+    setToolRaw('select')
+    setSelectedIds(objects.filter(o => !o.locked).map(o => o.id))
+  }
+
+  const group = () => {
+    if (selectedObjs.length < 2) {
+      notify('Seleziona almeno due oggetti da raggruppare')
+      return
+    }
+    const gid = crypto.randomUUID()
+    updateMany(o => ({ ...o, groupId: gid }))
+    notify(`Gruppo creato (${selectedObjs.length} oggetti) — Alt+clic per selezionarne uno solo`)
+  }
+
+  const ungroup = () => {
+    if (!selectedObjs.some(o => o.groupId)) return
+    updateMany(o => ({ ...o, groupId: undefined }))
+    notify('Gruppo sciolto')
+  }
+
+  const align = (kind: AlignKind) => setObjects(objs => alignObjects(objs, selectedIds, kind))
 
   const screenshot = () => {
     const svg = document.querySelector('svg.canvas') as SVGSVGElement | null
@@ -311,8 +355,8 @@ export default function App() {
 
   useEffect(() => {
     const onCopy = (e: ClipboardEvent) => {
-      if (isTyping(e.target) || !selected || !e.clipboardData) return
-      e.clipboardData.setData('text/plain', CLIP_MARKER + JSON.stringify([selected]))
+      if (isTyping(e.target) || !selectedObjs.length || !e.clipboardData) return
+      e.clipboardData.setData('text/plain', CLIP_MARKER + JSON.stringify(selectedObjs))
       e.preventDefault()
       if (e.type === 'cut') deleteSelected()
     }
@@ -352,6 +396,9 @@ export default function App() {
         else if (e.key === '[') { e.preventDefault(); reorder(false) }
         else if (key === '0') { e.preventDefault(); zoomToFit() }
         else if (key === 'l') { e.preventDefault(); toggleLock() }
+        else if (key === 'a') { e.preventDefault(); selectAll() }
+        else if (key === 'g' && e.shiftKey) { e.preventDefault(); ungroup() }
+        else if (key === 'g') { e.preventDefault(); group() }
         return
       }
       if (e.altKey) return
@@ -366,12 +413,12 @@ export default function App() {
         deleteSelected()
         return
       }
-      if (e.key.startsWith('Arrow') && selected && !selected.locked) {
+      if (e.key.startsWith('Arrow') && selectedObjs.length) {
         e.preventDefault()
         const step = e.shiftKey ? 10 : 1
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
         const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
-        setObjects(objs => objs.map(o => (o.id === selected.id ? translateObject(o, dx, dy) : o)))
+        updateMany(o => (o.locked ? o : translateObject(o, dx, dy)))
         return
       }
       if (e.key === '+' || e.key === '=') return zoomAt(1.2)
@@ -410,6 +457,11 @@ export default function App() {
         onDelete={deleteSelected}
         onPaste={pasteFromClipboard}
         onToggleLock={toggleLock}
+        selectionCount={selectedObjs.length}
+        allLocked={selectedObjs.length > 0 && selectedObjs.every(o => o.locked)}
+        grouped={selectedObjs.some(o => o.groupId)}
+        onGroup={group}
+        onUngroup={ungroup}
         panelOpen={panelOpen}
         togglePanel={() => setPanelOpen(v => !v)}
       />
@@ -428,8 +480,8 @@ export default function App() {
           <Canvas
             objects={objects}
             setObjects={setObjects}
-            selectedId={selectedId}
-            setSelectedId={setSelectedId}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
             view={view}
             setView={setView}
             zoom={zoom}
@@ -481,6 +533,10 @@ export default function App() {
           <aside className="side-panel">
             <RightPanel
               selected={selected}
+              selectedObjs={selectedObjs}
+              onAlign={align}
+              onGroup={group}
+              onUngroup={ungroup}
               objects={objects}
               onChange={updateSelected}
               onAddObject={addObject}

@@ -840,3 +840,53 @@ button:disabled {
   font-size: 0.7rem;
   color: var(--text-muted);
 }
+
+/* ================= SELEZIONE MULTIPLA ================= */
+
+.multi-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.multi-summary span {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+}
+
+.multi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.align-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.align-btn {
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  background: white;
+  color: #334155;
+}
+
+.align-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.align-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  margin: 0 4px;
+}

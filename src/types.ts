@@ -11,6 +11,8 @@ export type BaseObject = {
   strokeDash?: StrokeDash
   /** Bloccato: non si sposta, ridimensiona o elimina finché non viene sbloccato */
   locked?: boolean
+  /** Oggetti con lo stesso groupId si selezionano e si muovono insieme */
+  groupId?: string
 }
 
 export type StrokeDash = 'solid' | 'dashed' | 'dotted'
@@ -71,6 +73,7 @@ export type PolylineObject = {
   rotation?: number
   strokeDash?: StrokeDash
   locked?: boolean
+  groupId?: string
 }
 
 export type ImageObject = BaseObject & {

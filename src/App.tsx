@@ -4,7 +4,6 @@ import type { ToolId } from './tools'
 import { TOOLS } from './tools'
 import { Canvas } from './Canvas'
 import { Toolbar } from './Toolbar'
-import type { AddKind } from './Toolbar'
 import { RightPanel } from './RightPanel'
 import type { PanelTab } from './RightPanel'
 import { StyleBar } from './StyleBar'
@@ -185,16 +184,6 @@ export default function App() {
     setObjects(prev => [...prev, o])
     setSelectedId(o.id)
     setToolRaw('select')
-  }
-
-  const onAdd = (kind: AddKind) => {
-    const c = getCenter()
-    const id = crypto.randomUUID()
-    switch (kind) {
-      case 'bubble':
-        setNextBubbleNumber(n => n + 1)
-        return addObject({ id, type: 'symbol', symbolType: 'bubble', x: c.x, y: c.y, value: nextBubbleNumber, stroke: drawStyle.stroke, strokeWidth: 2, fillEnabled: true, fillColor: '#fde047' })
-    }
   }
 
   const updateSelected = (patch: Partial<CanvasObject>) => {
@@ -390,7 +379,6 @@ export default function App() {
 
       const shortcutTool = (Object.values(TOOLS).find(t => t.shortcut?.toLowerCase() === key))
       if (shortcutTool) return setTool(shortcutTool.id)
-      if (key === 'n') return onAdd('bubble')
       if (key === 'g') return setShowGrid(v => !v)
       if (key === 's') return setSnapEnabled(v => !v)
       if (key === 'o') return setOrthoEnabled(v => !v)
@@ -408,7 +396,6 @@ export default function App() {
         tool={tool}
         setTool={setTool}
         selected={selected}
-        onAdd={onAdd}
         canUndo={history.canUndo}
         canRedo={history.canRedo}
         onUndo={() => { history.undo(); setSelectedId(null) }}
@@ -457,6 +444,8 @@ export default function App() {
             onCursorMove={setCursor}
             notify={notify}
             placeProfileCode={placeProfile}
+            nextBubbleNumber={nextBubbleNumber}
+            onBubblePlaced={() => setNextBubbleNumber(n => n + 1)}
           />
 
           <StyleBar selected={selected} drawStyle={drawStyle} onChange={onStyleChange} />

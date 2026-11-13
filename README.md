@@ -26,7 +26,7 @@ npm run dev
 | R / C | Rettangolo / Cerchio (trascina; Shift = quadrato) |
 | T | Testo: clic e scrivi; doppio clic su un testo per modificarlo |
 | I | Profilo: scegli nel catalogo (si apre da solo) e clicca sulla tela per inserirlo |
-| N | Bollino numerato |
+| N | Bollino numerato: ogni clic sulla tela aggiunge il numero successivo, fino a Esc o a un altro strumento |
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |
 | B | Bullone: clic per inserirlo; diametro, classe, vista (testa, dado, foro, sezione) e ripetizione nel pannello |

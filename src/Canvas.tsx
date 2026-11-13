@@ -43,6 +43,9 @@ type Props = {
   notify?: (msg: string) => void
   /** Codice del profilo da inserire con lo strumento Profilo */
   placeProfileCode: string
+  /** Numero del prossimo bollino e funzione che lo fa avanzare */
+  nextBubbleNumber: number
+  onBubblePlaced: () => void
 }
 
 /** Interazione col puntatore in corso (una sola alla volta) */
@@ -63,7 +66,7 @@ export function Canvas({
   objects, setObjects, selectedId, setSelectedId,
   view, setView, zoom, setZoom,
   gridSize, showGrid, snapEnabled, orthoEnabled,
-  tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode,
+  tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode, nextBubbleNumber, onBubblePlaced,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const action = useRef<Interaction | null>(null)
@@ -139,6 +142,11 @@ export function Canvas({
       setSelectedId(o.id)
     }
   }
+
+  const makeBubble = (value: number, p: Point): CanvasObject => ({
+    id: crypto.randomUUID(), type: 'symbol', symbolType: 'bubble', x: p.x, y: p.y, value,
+    stroke: drawStyle.stroke, strokeWidth: 2, fillEnabled: true, fillColor: '#fde047',
+  })
 
   const makeProfile = (code: string, series: string, p: Point): CanvasObject => ({
     id: crypto.randomUUID(), type: 'profile', profileType: series, profileName: code,
@@ -270,6 +278,12 @@ export function Canvas({
         setTool('select')
         setSelectedId(id)
         setEditingId(id)
+        return
+      }
+      case 'bubble': {
+        // resta attivo: ogni clic aggiunge il bollino successivo
+        addObject(makeBubble(nextBubbleNumber, pick(e)))
+        onBubblePlaced()
         return
       }
       case 'profile': {
@@ -422,7 +436,7 @@ export function Canvas({
     if (!a) {
       if (segment && (tool === 'quote' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
-      } else if (tool === 'profile') {
+      } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
       } else if (polyPoints) {
         setHover(pick(e, polyPoints[polyPoints.length - 1]))
@@ -646,6 +660,13 @@ export function Canvas({
                 </g>
               )
             })()}
+
+            {/* anteprima del prossimo bollino */}
+            {tool === 'bubble' && hover && (
+              <g opacity={0.45} pointerEvents="none">
+                <ObjectView o={makeBubble(nextBubbleNumber, hover)} interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
 
             {/* bozze */}
             {segment && tool === 'line' && (

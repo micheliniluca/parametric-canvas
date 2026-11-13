@@ -3,17 +3,15 @@ import type { CanvasObject } from './types'
 import type { ToolId } from './tools'
 import { TOOLS } from './tools'
 import {
-  Hash, Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
+  Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
   ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose,
 } from 'lucide-react'
 
-export type AddKind = 'bubble'
 
 type Props = {
   tool: ToolId
   setTool: (t: ToolId) => void
   selected: CanvasObject | null
-  onAdd: (k: AddKind) => void
   canUndo: boolean
   canRedo: boolean
   onUndo: () => void
@@ -98,7 +96,7 @@ export function Toolbar(p: Props) {
         {toolBtn('profile')}
         {toolBtn('bolt')}
         {toolBtn('quote')}
-        <Btn title="Bollino numerato (N)" onClick={() => p.onAdd('bubble')}><Hash size={18} /></Btn>
+        {toolBtn('bubble')}
         {toolBtn('measure')}
         <Sep />
         {toolBtn('scale')}

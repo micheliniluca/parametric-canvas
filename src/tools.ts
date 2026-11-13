@@ -10,6 +10,7 @@ import {
   Maximize,
   Wand2,
   Scissors,
+  Hash,
   Square,
   Circle,
   Type,
@@ -27,6 +28,7 @@ export type ToolId =
   | 'circle'
   | 'text'
   | 'profile'
+  | 'bubble'
   | 'freehand'
   | 'arrow'
   | 'bolt'
@@ -59,6 +61,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   circle: { id: 'circle', label: 'Cerchio', icon: Circle, shortcut: 'C', hint: 'Trascina dal centro verso il bordo, clic per dimensione standard' },
   text: { id: 'text', label: 'Testo', icon: Type, shortcut: 'T', hint: 'Clic dove inserire il testo e scrivi. Ctrl+Invio o Esc per terminare' },
   profile: { id: 'profile', label: 'Profilo', icon: IconIPE, shortcut: 'I', hint: 'Clic sulla tela per inserire il profilo scelto nel catalogo (Ctrl = snap)' },
+  bubble: { id: 'bubble', label: 'Bollino numerato', icon: Hash, shortcut: 'N', sticky: true, hint: 'Clic sulla tela per inserire i bollini in sequenza (1, 2, 3…). Esc per terminare' },
   arrow: { id: 'arrow', label: 'Freccia', icon: ArrowUpRight, shortcut: 'A', hint: 'Trascina dalla coda alla punta' },
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
   quote: { id: 'quote', label: 'Quota', icon: IconDimension, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
@@ -72,4 +75,4 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
   t === 'bolt' || t === 'quote' || t === 'measure' || t === 'scale' ||
-  t === 'rect' || t === 'circle' || t === 'text' || t === 'profile'
+  t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

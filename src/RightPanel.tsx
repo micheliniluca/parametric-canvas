@@ -11,6 +11,7 @@ import {
 } from './utils/cableUtils'
 import { exportToDXF } from './utils/export'
 import { downloadText } from './utils/project'
+import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
 import {
   Database, Download, SlidersHorizontal, MousePointerClick,
@@ -29,6 +30,8 @@ type Props = {
   onUngroup: () => void
   objects: CanvasObject[]
   onChange: (patch: Partial<CanvasObject>) => void
+  /** Modifica tutti gli oggetti selezionati */
+  onChangeAll: (patch: Partial<CanvasObject>) => void
   onAddObject: (obj: CanvasObject) => void
   getCenter: () => { x: number; y: number }
   screenshotMode: ScreenshotMode
@@ -97,7 +100,7 @@ function Num({ value, onChange, min, step }: { value: number; onChange: (v: numb
 
 /** Pannello laterale: proprietà dell'oggetto selezionato, catalogo profili ed esportazione */
 export function RightPanel({
-  selected, objects, onChange, screenshotMode, setScreenshotMode, onScreenshot,
+  selected, objects, onChange, onChangeAll, screenshotMode, setScreenshotMode, onScreenshot,
   tab, setTab, placingProfileCode, onPickProfile, selectedObjs, onAlign, onGroup, onUngroup,
 }: Props) {
   const placing = placingProfileCode ? findProfile(placingProfileCode) : undefined
@@ -171,7 +174,7 @@ export function RightPanel({
         )}
 
         {tab === 'props' && selectedObjs.length > 1 && (
-          <MultiProps objs={selectedObjs} onAlign={onAlign} onGroup={onGroup} onUngroup={onUngroup} />
+          <MultiProps objs={selectedObjs} onAlign={onAlign} onGroup={onGroup} onUngroup={onUngroup} onChangeAll={onChangeAll} />
         )}
 
         {tab === 'props' && selectedObjs.length === 0 && (
@@ -289,9 +292,47 @@ function CableProps({ o, onChange }: { o: CableObject; onChange: (patch: Partial
   )
 }
 
+/**
+ * Trasparenza del riempimento e dell'intero oggetto (0 % = opaco).
+ * Con più oggetti e valori diversi lo indica come "misto"; spostando il cursore li uniforma.
+ */
+function Transparency({ objs, onChange }: { objs: CanvasObject[]; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const withFill = objs.filter(o => styleCaps(o).fill)
+  const anyFilled = withFill.some(o => o.fillEnabled)
+  const row = (label: string, key: 'fillOpacity' | 'opacity', list: CanvasObject[], max: number, hint?: string) => {
+    const values = list.map(o => o[key] ?? 1)
+    const mixed = values.some(v => Math.abs(v - values[0]) > 1e-6)
+    // il cursore indica la trasparenza (inverso dell'opacità)
+    const t = Math.round((1 - values[0]) * 100)
+    return (
+      <div className="opacity-row">
+        <span className="opacity-label">{label}</span>
+        <input
+          type="range" min={0} max={max} step={5} value={t}
+          aria-label={`Trasparenza ${label.toLowerCase()}`}
+          onChange={e => onChange({ [key]: 1 - Number(e.target.value) / 100 })}
+        />
+        <span className="opacity-value">{mixed ? 'misto' : `${t} %`}</span>
+        {hint && <span className="muted opacity-hint">{hint}</span>}
+      </div>
+    )
+  }
+  return (
+    <>
+      <h4>Trasparenza</h4>
+      <div className="opacity-group">
+        {withFill.length > 0 && row('Riempimento', 'fillOpacity', withFill, 100,
+          anyFilled ? undefined : 'Nessun riempimento attivo: sceglilo dalla barra stili.')}
+        {row('Oggetto', 'opacity', objs, 95)}
+      </div>
+    </>
+  )
+}
+
 /** Più oggetti selezionati: riepilogo, gruppi, allinea e distribuisci */
-function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
+function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
   objs: CanvasObject[]
+  onChangeAll: (patch: Partial<CanvasObject>) => void
   onAlign: (kind: AlignKind) => void
   onGroup: () => void
   onUngroup: () => void
@@ -332,6 +373,8 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup }: {
         <p className="muted" style={{ margin: 0 }}>Peso (profili in vista laterale/dall'alto, cavi): <b>{round1(weight)} kg</b></p>
       )}
       {locked > 0 && <p className="muted" style={{ margin: 0 }}>{locked} bloccati: non si spostano.</p>}
+
+      <Transparency objs={objs} onChange={onChangeAll} />
 
       <h4>Gruppo</h4>
       <div className="multi-actions">
@@ -525,19 +568,15 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
 
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
 
-      {o.type === 'image' && (
+      {o.type === 'image' && o.clipPoints && (
         <div className="prop-grid">
-          <Field label="Opacità" full>
-            <input type="range" min={0.05} max={1} step={0.05} value={o.opacity}
-              onChange={e => onChange({ opacity: Number(e.target.value) })} />
-          </Field>
-          {o.clipPoints && (
-            <button className="btn-danger full-width" onClick={() => onChange({ clipPoints: undefined })}>
-              Rimuovi scontorno
-            </button>
-          )}
+          <button className="btn-danger full-width" onClick={() => onChange({ clipPoints: undefined })}>
+            Rimuovi scontorno
+          </button>
         </div>
       )}
+
+      <Transparency objs={[o]} onChange={onChange} />
 
       {/* ---------- geometria ---------- */}
       <h4>Geometria</h4>

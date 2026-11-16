@@ -539,6 +539,7 @@ export default function App() {
               onUngroup={ungroup}
               objects={objects}
               onChange={updateSelected}
+              onChangeAll={patch => updateMany(o => ({ ...o, ...patch }) as CanvasObject)}
               onAddObject={addObject}
               getCenter={getCenter}
               screenshotMode={screenshotMode}

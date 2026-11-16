@@ -19,7 +19,16 @@ type Props = {
 }
 
 /** Disegna un singolo oggetto. Nessuna logica di selezione: quella sta in SelectionOverlay. */
-export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideText, imageSrcOverride }: Props) {
+export function ObjectView(props: Props) {
+  const { o } = props
+  const el = renderObject(props)
+  // l'immagine gestisce l'opacità sul proprio elemento
+  const op = o.type === 'image' ? 1 : o.opacity ?? 1
+  return op < 1 ? <g opacity={op}>{el}</g> : el
+}
+
+function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, imageSrcOverride }: Props) {
+  const fo = o.fillOpacity
   const pe = interactive ? 'all' : 'none'
   const down = (e: ReactMouseEvent) => onMouseDown(e, o)
   const stroke = o.stroke || '#0f172a'
@@ -34,7 +43,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
         <rect
           x={o.x} y={o.y} width={o.width} height={o.height}
           transform={transform}
-          fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'}
+          fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
           stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
           pointerEvents={pe} onMouseDown={down}
         />
@@ -46,7 +55,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
       return (
         <circle
           cx={o.x} cy={o.y} r={o.radius}
-          fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'}
+          fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
           stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
           pointerEvents={pe} onMouseDown={down}
         />
@@ -83,7 +92,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
           )}
           <polyline
             points={pts}
-            fill={filled ? o.fillColor || '#cbd5e1' : 'none'}
+            fill={filled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
             stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
             strokeLinejoin="round" strokeLinecap="round"
             pointerEvents={interactive ? (o.closed ? 'all' : 'stroke') : 'none'} onMouseDown={down}
@@ -107,7 +116,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
         >
           <rect
             x={o.x} y={o.y} width={w} height={h}
-            fill={o.boxEnabled && o.fillEnabled ? o.fillColor || 'white' : 'transparent'}
+            fill={o.boxEnabled && o.fillEnabled ? o.fillColor || 'white' : 'transparent'} fillOpacity={fo}
             stroke={o.boxEnabled ? stroke : 'none'} strokeWidth={sw}
             strokeDasharray={o.boxEnabled ? dashArray(o.strokeDash, sw) : undefined}
             pointerEvents={pe}
@@ -192,7 +201,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
           <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
           <path d={parts.map(p => p.axis).join('')} fill="none" stroke={stroke} strokeOpacity={0.6}
             strokeWidth={sw * 0.35} strokeDasharray={`${sw * 6} ${sw * 1.5} ${sw * 1} ${sw * 1.5}`} pointerEvents="none" />
-          <path d={parts.map(p => p.outline).join('')} fill={o.fillEnabled ? o.fillColor || 'white' : 'none'}
+          <path d={parts.map(p => p.outline).join('')} fill={o.fillEnabled ? o.fillColor || 'white' : 'none'} fillOpacity={fo}
             fillRule="evenodd" stroke={stroke} strokeWidth={sw} strokeLinejoin="round" pointerEvents="none" />
           <path d={parts.map(p => p.thin).join('')} fill="none" stroke={stroke} strokeWidth={sw * 0.5} pointerEvents="none" />
           {o.showLabel && (
@@ -221,11 +230,11 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
           <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.5}
             strokeDasharray="12 3 2 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
           {dr.rope && (
-            <path d={dr.rope} fill={fill} stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+            <path d={dr.rope} fill={fill} fillOpacity={fo} stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
               strokeLinejoin="round" pointerEvents={pe} />
           )}
           {dr.outline && (
-            <path d={dr.outline} fill={fill} fillRule="evenodd" stroke={stroke} strokeWidth={sw}
+            <path d={dr.outline} fill={fill} fillOpacity={fo} fillRule="evenodd" stroke={stroke} strokeWidth={sw}
               vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
           )}
           {dr.thin && (
@@ -247,7 +256,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
         <g transform={transform} onMouseDown={down}>
           <circle
             cx={o.x} cy={o.y} r={15}
-            fill={o.fillEnabled ? o.fillColor || '#fde047' : 'white'}
+            fill={o.fillEnabled ? o.fillColor || '#fde047' : 'white'} fillOpacity={fo}
             stroke={stroke} strokeWidth={o.strokeWidth ?? 2}
             pointerEvents={pe}
           />
@@ -276,7 +285,7 @@ export function ObjectView({ o, interactive, onMouseDown, onDoubleClick, hideTex
         <g transform={`${transform ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onMouseDown={down} pointerEvents={pe}>
           <path
             d={path} fillRule="evenodd"
-            fill={o.fillEnabled ? o.fillColor || '#94a3b8' : 'none'}
+            fill={o.fillEnabled ? o.fillColor || '#94a3b8' : 'none'} fillOpacity={fo}
             stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
             strokeDasharray={dashArray(o.strokeDash, sw)}
             pointerEvents={pe}

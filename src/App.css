@@ -912,3 +912,34 @@ button:disabled {
   padding-right: 8px;
   white-space: nowrap;
 }
+
+/* trasparenza nel pannello proprietà */
+.opacity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opacity-row {
+  display: grid;
+  grid-template-columns: 86px 1fr 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.opacity-row input[type='range'] {
+  width: 100%;
+  margin: 0;
+}
+
+.opacity-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.opacity-hint {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+}

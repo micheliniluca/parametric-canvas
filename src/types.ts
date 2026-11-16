@@ -13,6 +13,10 @@ export type BaseObject = {
   locked?: boolean
   /** Oggetti con lo stesso groupId si selezionano e si muovono insieme */
   groupId?: string
+  /** Opacità dell'intero oggetto, 0–1 (assente = 1) */
+  opacity?: number
+  /** Opacità del solo riempimento, 0–1 (assente = 1) */
+  fillOpacity?: number
 }
 
 export type StrokeDash = 'solid' | 'dashed' | 'dotted'
@@ -74,6 +78,8 @@ export type PolylineObject = {
   strokeDash?: StrokeDash
   locked?: boolean
   groupId?: string
+  opacity?: number
+  fillOpacity?: number
 }
 
 export type ImageObject = BaseObject & {

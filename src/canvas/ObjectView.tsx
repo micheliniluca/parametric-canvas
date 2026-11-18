@@ -116,7 +116,8 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
         >
           <rect
             x={o.x} y={o.y} width={w} height={h}
-            fill={o.boxEnabled && o.fillEnabled ? o.fillColor || 'white' : 'transparent'} fillOpacity={fo}
+            // lo sfondo dipende solo dal riempimento; il bordo è a parte
+            fill={o.fillEnabled ? o.fillColor || 'white' : 'transparent'} fillOpacity={fo}
             stroke={o.boxEnabled ? stroke : 'none'} strokeWidth={sw}
             strokeDasharray={o.boxEnabled ? dashArray(o.strokeDash, sw) : undefined}
             pointerEvents={pe}

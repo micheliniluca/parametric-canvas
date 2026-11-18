@@ -430,7 +430,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
           <Field label="Dimensione">
             <Num value={o.fontSize} min={1} onChange={v => onChange({ fontSize: v })} />
           </Field>
-          <Field label="Riquadro">
+          <Field label="Bordo">
             <select value={o.boxEnabled ? 'on' : 'off'} onChange={e => onChange({ boxEnabled: e.target.value === 'on' })}>
               <option value="off">Nessuno</option>
               <option value="on">Con bordo</option>

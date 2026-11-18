@@ -20,6 +20,7 @@ import {
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
 } from 'lucide-react'
 import type { AlignKind } from './canvas/geometry'
+import { textSize } from './canvas/geometry'
 
 type Props = {
   selected: CanvasObject | null
@@ -589,8 +590,9 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         )}
         {(o.type === 'rect' || o.type === 'text' || o.type === 'image') && (
           <>
-            <Field label="Larghezza"><Num value={o.width || 0} min={1} onChange={v => onChange({ width: v })} /></Field>
-            <Field label="Altezza"><Num value={o.height || 0} min={1} onChange={v => onChange({ height: v })} /></Field>
+            {/* il testo senza misure manuali si adatta al contenuto: si mostra la misura reale */}
+            <Field label="Larghezza"><Num value={o.type === 'text' ? textSize(o).w : o.width} min={1} onChange={v => onChange({ width: v })} /></Field>
+            <Field label="Altezza"><Num value={o.type === 'text' ? textSize(o).h : o.height} min={1} onChange={v => onChange({ height: v })} /></Field>
           </>
         )}
         {o.type === 'circle' && (

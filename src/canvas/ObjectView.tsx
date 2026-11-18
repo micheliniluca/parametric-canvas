@@ -45,7 +45,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           transform={transform}
           fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
           stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
-          pointerEvents={pe} onMouseDown={down}
+          pointerEvents={pe} onPointerDown={down}
         />
       )
     }
@@ -57,7 +57,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           cx={o.x} cy={o.y} r={o.radius}
           fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
           stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
-          pointerEvents={pe} onMouseDown={down}
+          pointerEvents={pe} onPointerDown={down}
         />
       )
     }
@@ -71,7 +71,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           transform={transform}
           preserveAspectRatio="none"
           clipPath={o.clipPoints && o.clipPoints.length > 2 ? `url(#clip-${o.id})` : undefined}
-          pointerEvents={pe} onMouseDown={down}
+          pointerEvents={pe} onPointerDown={down}
         />
       )
 
@@ -87,16 +87,20 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
               points={pts} fill="none" stroke="transparent"
               strokeWidth={Math.max(12, sw + 8)}
               strokeLinejoin="round" strokeLinecap="round"
-              pointerEvents={interactive ? 'stroke' : 'none'} onMouseDown={down}
+              pointerEvents={interactive ? 'stroke' : 'none'} onPointerDown={down}
             />
           )}
+          {o.pressures && o.pressures.length === o.points.length && !o.closed ? (
+            <PressureStroke points={o.points} pressures={o.pressures} width={sw} stroke={stroke} />
+          ) : (
           <polyline
             points={pts}
             fill={filled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
             stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
             strokeLinejoin="round" strokeLinecap="round"
-            pointerEvents={interactive ? (o.closed ? 'all' : 'stroke') : 'none'} onMouseDown={down}
+            pointerEvents={interactive ? (o.closed ? 'all' : 'stroke') : 'none'} onPointerDown={down}
           />
+          )}
         </g>
       )
     }
@@ -110,7 +114,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       return (
         <g
           transform={transform}
-          onMouseDown={down}
+          onPointerDown={down}
           onDoubleClick={e => { e.stopPropagation(); onDoubleClick?.(o) }}
           style={{ cursor: interactive && !o.locked ? 'move' : undefined }}
         >
@@ -150,7 +154,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       return (
         <g transform={transform}>
           <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent"
-            strokeWidth={Math.max(14, sw + 10)} pointerEvents={interactive ? 'stroke' : 'none'} onMouseDown={down} />
+            strokeWidth={Math.max(14, sw + 10)} pointerEvents={interactive ? 'stroke' : 'none'} onPointerDown={down} />
           <line x1={o.x1} y1={o.y1} x2={ex} y2={ey} stroke={stroke} strokeWidth={sw}
             strokeDasharray={dashArray(o.strokeDash, sw)} pointerEvents="none" />
           <path
@@ -175,7 +179,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       return (
         <g transform={transform}>
           <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent"
-            strokeWidth={Math.max(14, sw + 10)} pointerEvents={interactive ? 'stroke' : 'none'} onMouseDown={down} />
+            strokeWidth={Math.max(14, sw + 10)} pointerEvents={interactive ? 'stroke' : 'none'} onPointerDown={down} />
           <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke={stroke} strokeWidth={sw} pointerEvents="none" />
           {[{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }].map((p, i) => (
             <line key={i} transform={`translate(${p.x}, ${p.y}) rotate(${angleDeg})`}
@@ -198,7 +202,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       const parts = boltCenters(o).map(c => boltDrawing(o, c))
       const b = boltBounds(o)
       return (
-        <g transform={transform} onMouseDown={down} pointerEvents={pe}>
+        <g transform={transform} onPointerDown={down} pointerEvents={pe}>
           <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
           <path d={parts.map(p => p.axis).join('')} fill="none" stroke={stroke} strokeOpacity={0.6}
             strokeWidth={sw * 0.35} strokeDasharray={`${sw * 6} ${sw * 1.5} ${sw * 1} ${sw * 1.5}`} pointerEvents="none" />
@@ -225,7 +229,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       const side = textAngle === dr.angle ? -1 : 1
       const mid = { x: (o.x1 + o.x2) / 2 + dr.v.x * off * side, y: (o.y1 + o.y2) / 2 + dr.v.y * off * side }
       return (
-        <g transform={transform} onMouseDown={down}>
+        <g transform={transform} onPointerDown={down}>
           <path d={dr.axis} stroke="transparent" strokeWidth={14} vectorEffect="non-scaling-stroke" fill="none"
             pointerEvents={interactive ? 'stroke' : 'none'} />
           <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.5}
@@ -254,7 +258,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
     case 'symbol':
       if (o.symbolType !== 'bubble') return null
       return (
-        <g transform={transform} onMouseDown={down}>
+        <g transform={transform} onPointerDown={down}>
           <circle
             cx={o.x} cy={o.y} r={15}
             fill={o.fillEnabled ? o.fillColor || '#fde047' : 'white'} fillOpacity={fo}
@@ -283,7 +287,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
             {labelText}
           </text>
         )}
-        <g transform={`${transform ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onMouseDown={down} pointerEvents={pe}>
+        <g transform={`${transform ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onPointerDown={down} pointerEvents={pe}>
           <path
             d={path} fillRule="evenodd"
             fill={o.fillEnabled ? o.fillColor || '#94a3b8' : 'none'} fillOpacity={fo}
@@ -300,4 +304,28 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       )
     }
   }
+}
+
+/**
+ * Tratto a mano libera con spessore che segue la pressione della penna:
+ * un segmento per coppia di punti, con estremità arrotondate perché si raccordino.
+ */
+export function PressureStroke({ points, pressures, width, stroke }: {
+  points: { x: number; y: number }[]
+  pressures: number[]
+  width: number
+  stroke: string
+}) {
+  const w = (p: number) => width * (0.25 + 1.5 * p)
+  return (
+    <g pointerEvents="none">
+      {points.slice(1).map((p, i) => (
+        <line
+          key={i}
+          x1={points[i].x} y1={points[i].y} x2={p.x} y2={p.y}
+          stroke={stroke} strokeWidth={(w(pressures[i]) + w(pressures[i + 1])) / 2} strokeLinecap="round"
+        />
+      ))}
+    </g>
+  )
 }

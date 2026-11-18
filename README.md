@@ -46,7 +46,11 @@ npm run dev
 | Frecce (Shift) | Sposta di 1 (10) |
 | Canc | Elimina |
 | Esc | Torna alla selezione |
-| Tasto centrale | Sposta la vista |
+| Tasto centrale, Spazio + trascina | Sposta la vista |
+| Invio | Modifica il testo selezionato (chiude polilinea e scontorno) |
+
+**Con la penna grafica**: il tasto laterale della penna tenuto premuto sposta la vista, il doppio tocco
+chiude polilinea e scontorno, le maniglie diventano più grandi e la mano libera segue la pressione.
 
 Il disegno viene salvato automaticamente nel browser (IndexedDB) e ripristinato alla riapertura.
 Con più oggetti selezionati il pannello mostra il riepilogo, i comandi di gruppo e allinea / distribuisci.

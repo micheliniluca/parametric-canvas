@@ -70,6 +70,8 @@ export type PolylineObject = {
   type: 'polyline'
   points: Point[]
   closed: boolean
+  /** Pressione della penna per ogni punto (mano libera): spessore variabile */
+  pressures?: number[]
   stroke: string
   strokeWidth?: number
   fillEnabled: boolean

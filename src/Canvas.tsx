@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react'
+import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, SetStateAction } from 'react'
 import type { CanvasObject, Point } from './types'
 import type { ToolId } from './tools'
 import { TOOLS, isCreationTool } from './tools'
@@ -10,7 +10,7 @@ import {
   applyOrtho, dist, getObjectBounds, getObjectCenter, getSnapPoint,
   rotatePoint, scaleObject, translateObject, worldBounds, expandGroups, rotateObjectAround,
 } from './canvas/geometry'
-import { ObjectView } from './canvas/ObjectView'
+import { ObjectView, PressureStroke } from './canvas/ObjectView'
 import { MultiSelectionOverlay, SelectionOverlay } from './canvas/SelectionOverlay'
 import type { Corner, Grip } from './canvas/SelectionOverlay'
 import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
@@ -21,7 +21,14 @@ import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
 const SNAP_PX = 12
-const DRAG_THRESHOLD_PX = 3
+/**
+ * Soglia tra clic e trascinamento: la punta della penna (e il dito) tremano un po' al contatto,
+ * quindi serve più margine che col mouse.
+ */
+const dragThreshold = (pointerType: string) => (pointerType === 'pen' ? 6 : pointerType === 'touch' ? 10 : 3)
+/** Due pressioni entro questo tempo (e vicine) valgono come doppio clic */
+const DOUBLE_TAP_MS = 400
+const round2 = (v: number) => Math.round(v * 100) / 100
 const ACCENT = '#6366f1'
 
 type Props = {
@@ -94,6 +101,24 @@ export function Canvas({
   const setSelectedId = (id: string | null) => setSelectedIds(id ? [id] : [])
   const selected = objects.find(o => o.id === selectedId) ?? null
   const selectedObjs = selectedIds.length > 1 ? objects.filter(o => selectedIds.includes(o.id)) : []
+  /** Tipo di puntatore in uso (mouse, pen, touch): regola tolleranze e maniglie */
+  const pointerType = useRef('mouse')
+  const [coarsePointer, setCoarsePointer] = useState(false)
+  const dragPx = () => dragThreshold(pointerType.current)
+  const notePointer = (e: ReactPointerEvent) => {
+    pointerType.current = e.pointerType || 'mouse'
+    const coarse = e.pointerType === 'pen' || e.pointerType === 'touch'
+    if (coarse !== coarsePointer) setCoarsePointer(coarse)
+  }
+  /** Ultima pressione sullo sfondo, per riconoscere il doppio clic/tocco anche con la penna */
+  const lastDown = useRef({ t: 0, x: 0, y: 0 })
+  /** Spazio tenuto premuto: trascinando si sposta la vista */
+  const spaceDown = useRef(false)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const [panning, setPanning] = useState(false)
+  /** Pressione della penna per ogni punto della mano libera */
+  const pressures = useRef<number[] | null>(null)
+  const freehandPts = useRef<Point[] | null>(null)
   /** Riquadro di selezione in corso */
   const [marquee, setMarquee] = useState<{ a: Point; b: Point } | null>(null)
 
@@ -109,6 +134,32 @@ export function Canvas({
     setHover(null)
     if (tool !== 'wand') setWand(null)
   }, [tool])
+
+  // Spazio + trascina = pan (comodo con la penna, che non ha tasto centrale né rotella)
+  useEffect(() => {
+    const typing = (t: EventTarget | null) =>
+      t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement ||
+      (t instanceof HTMLElement && t.isContentEditable)
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || typing(e.target)) return
+      e.preventDefault()
+      if (!spaceDown.current) { spaceDown.current = true; setSpaceHeld(true) }
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      spaceDown.current = false
+      setSpaceHeld(false)
+    }
+    const reset = () => { spaceDown.current = false; setSpaceHeld(false) }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', reset)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', reset)
+    }
+  }, [])
 
   // se il testo in modifica viene eliminato (es. annulla) chiude l'editor
   useEffect(() => {
@@ -197,7 +248,8 @@ export function Canvas({
   /* ---------- pressione sugli oggetti ---------- */
 
   const onObjectMouseDown = (e: ReactMouseEvent, o: CanvasObject) => {
-    if (e.button !== 0) return
+    // con Spazio (o tasto laterale della penna) la pressione passa allo sfondo, che sposta la vista
+    if (e.button !== 0 || spaceDown.current) return
     e.stopPropagation()
     if (editingId && o.id !== editingId) finishEditing()
 
@@ -301,20 +353,25 @@ export function Canvas({
 
   /* ---------- pressione sullo sfondo / strumenti ---------- */
 
-  const onMouseDown = (e: ReactMouseEvent<SVGSVGElement>) => {
+  const onMouseDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (editingId) finishEditing()
-    // Tasto centrale: pan con qualsiasi strumento
-    if (e.button === 1) {
+    // Pan: tasto centrale, tasto laterale della penna, oppure Spazio + trascina
+    const penBarrel = e.pointerType === 'pen' && (e.button === 2 || (e.buttons & 2) !== 0)
+    if (e.button === 1 || penBarrel || (e.button === 0 && spaceDown.current)) {
       e.preventDefault()
       action.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }
+      setPanning(true)
       return
     }
     if (e.button !== 0) return
+    // doppio clic/tocco riconosciuto qui: con gli eventi pointer e.detail non è affidabile
+    const now = performance.now()
+    const ld = lastDown.current
+    const dbl = now - ld.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - ld.x, e.clientY - ld.y) < dragPx() * 3
+    lastDown.current = dbl ? { t: 0, x: 0, y: 0 } : { t: now, x: e.clientX, y: e.clientY }
 
     switch (tool) {
       case 'text': {
-        // senza questo il browser, finito il clic, toglie il focus all'editor appena aperto
-        e.preventDefault()
         const p = pick(e)
         const id = crypto.randomUUID()
         setObjects(prev => [...prev, {
@@ -361,7 +418,9 @@ export function Canvas({
         return
       }
       case 'freehand':
-        setFreehand([toWorld(e)])
+        pressures.current = e.pointerType === 'pen' ? [e.pressure] : null
+        freehandPts.current = [toWorld(e)]
+        setFreehand([...freehandPts.current])
         action.current = { kind: 'freehand' }
         return
       case 'quote':
@@ -396,7 +455,7 @@ export function Canvas({
           setPolyPoints([p])
           return
         }
-        if (e.detail >= 2) {
+        if (dbl) {
           finishPolyline(false)
           return
         }
@@ -410,7 +469,7 @@ export function Canvas({
       }
       case 'crop': {
         if (!selected || selected.type !== 'image') return
-        if (e.detail >= 2) {
+        if (dbl) {
           applyCrop()
           return
         }
@@ -471,6 +530,11 @@ export function Canvas({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (polyPoints) finishPolyline(false)
       else if (cropPoints) applyCrop()
+      else if (tool === 'select' && selected?.type === 'text' && !selected.locked && !editingId) {
+        // alternativa al doppio clic, comoda con la penna
+        e.preventDefault()
+        setEditingId(selected.id)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -478,7 +542,13 @@ export function Canvas({
 
   /* ---------- movimento ---------- */
 
-  const onMouseMove = (e: ReactMouseEvent<SVGSVGElement>) => {
+  const onMouseMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    notePointer(e)
+    // durante un trascinamento il tratto resta alla tela anche se il puntatore ne esce
+    const svg = svgRef.current
+    if (action.current && e.buttons && svg && !svg.hasPointerCapture(e.pointerId)) {
+      try { svg.setPointerCapture(e.pointerId) } catch { /* puntatore già rilasciato */ }
+    }
     const w = toWorld(e)
     onCursorMove?.(w)
     const a = action.current
@@ -517,15 +587,30 @@ export function Canvas({
         })
         return
 
-      case 'freehand':
-        setFreehand(prev => {
-          if (!prev) return prev
-          return dist(prev[prev.length - 1], w) > 1.5 / zoom ? [...prev, w] : prev
-        })
+      case 'freehand': {
+        // la penna invia più campioni per fotogramma: si usano tutti per un tratto più fluido
+        const native = e.nativeEvent
+        const coalesced = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : []
+        const samples = coalesced.length ? coalesced : [native]
+        // punti e pressioni si accumulano fuori dallo stato (React può ripetere gli aggiornamenti)
+        const pts = freehandPts.current
+        if (!pts) return
+        const pr = pressures.current
+        let added = false
+        for (const sm of samples) {
+          const p = toWorld(sm)
+          if (dist(pts[pts.length - 1], p) > 1.5 / zoom) {
+            pts.push(p)
+            pr?.push(sm.pressure)
+            added = true
+          }
+        }
+        if (added) setFreehand([...pts])
         return
+      }
 
       case 'move': {
-        if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < DRAG_THRESHOLD_PX) return
+        if (!a.moved && Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < dragPx()) return
         a.moved = true
         // si aggancia il punto di presa, poi si traslano gli oggetti della stessa quantità
         const snapped = snapOn(e) ? getSnapPoint(objects, w, gridSize, SNAP_PX / zoom, a.ids) : w
@@ -541,7 +626,7 @@ export function Canvas({
       }
 
       case 'marquee':
-        if (Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < DRAG_THRESHOLD_PX) return
+        if (Math.hypot(e.clientX - a.sx, e.clientY - a.sy) < dragPx()) return
         setMarquee({ a: a.start, b: w })
         return
 
@@ -599,10 +684,11 @@ export function Canvas({
     const a = action.current
     action.current = null
     if (!a) return
+    if (a.kind === 'pan') setPanning(false)
 
     if (a.kind === 'marquee') {
       setMarquee(null)
-      const dragged = Math.hypot(e.clientX - a.sx, e.clientY - a.sy) >= DRAG_THRESHOLD_PX
+      const dragged = Math.hypot(e.clientX - a.sx, e.clientY - a.sy) >= dragPx()
       if (!dragged) {
         // semplice clic: sull'oggetto bloccato lo seleziona, sul vuoto deseleziona
         if (a.clickId) setSelectedIds(expandGroups(objects, [a.clickId]))
@@ -632,7 +718,7 @@ export function Canvas({
       const { p1, p2 } = segment
       setSegment(null)
       const fill = { fillEnabled: drawStyle.fillEnabled, fillColor: drawStyle.fillColor }
-      const clickOnly = dist(p1, p2) < 3 / zoom
+      const clickOnly = dist(p1, p2) < dragPx() / zoom
       if (tool === 'rect') {
         const r = clickOnly
           ? { x: p1.x - 60, y: p1.y - 40, width: 120, height: 80 }
@@ -659,12 +745,18 @@ export function Canvas({
     }
 
     if (a.kind === 'freehand' && freehand) {
+      const pr = pressures.current
       if (freehand.length > 2) {
+        // spessore variabile solo se la penna ha dato una pressione reale
+        const usePressure = !!pr && pr.length === freehand.length && pr.some(v => v > 0 && v !== 0.5)
         addObject({
           id: crypto.randomUUID(), type: 'polyline', points: freehand, closed: false,
           ...strokeProps(), fillEnabled: false,
+          ...(usePressure ? { pressures: pr.map(round2) } : {}),
         })
       }
+      pressures.current = null
+      freehandPts.current = null
       setFreehand(null)
     }
   }
@@ -673,15 +765,15 @@ export function Canvas({
   const mouseUpRef = useRef(onMouseUp)
   mouseUpRef.current = onMouseUp
   useEffect(() => {
-    const up = (e: MouseEvent) => { if (action.current?.kind === 'marquee') mouseUpRef.current(e) }
-    window.addEventListener('mouseup', up)
-    return () => window.removeEventListener('mouseup', up)
+    const up = (e: PointerEvent) => { if (action.current?.kind === 'marquee') mouseUpRef.current(e) }
+    window.addEventListener('pointerup', up)
+    return () => window.removeEventListener('pointerup', up)
   }, [])
 
   /* ---------- rendering ---------- */
 
   const interactiveObjects = tool === 'select' || tool === 'wand'
-  const cursor =
+  const cursor = panning ? 'grabbing' : spaceHeld ? 'grab' :
     tool === 'select' ? 'default' : tool === 'wand' ? 'crosshair' : isCreationTool(tool) || tool === 'crop' ? 'crosshair' : 'default'
 
   const k = 1 / zoom
@@ -699,11 +791,16 @@ export function Canvas({
         className="canvas"
         width="100%"
         height="100%"
-        style={{ cursor, display: 'block', background: 'white' }}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={e => { if (action.current?.kind !== 'marquee') onMouseUp(e) }}
+        // touch-action none: il browser non trasforma i tratti di penna e dita in scorrimenti o gesti
+        style={{ cursor, display: 'block', background: 'white', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+        // in cattura: vale anche quando la pressione cade su un oggetto (che ferma la propagazione)
+        onPointerDownCapture={notePointer}
+        onPointerDown={onMouseDown}
+        onPointerMove={onMouseMove}
+        onPointerUp={onMouseUp}
+        onPointerCancel={onMouseUp}
+        // con lo strumento Testo il browser toglierebbe il focus all'editor appena aperto
+        onMouseDown={e => { if (tool === 'text') e.preventDefault() }}
         onWheel={onWheel}
         onContextMenu={e => e.preventDefault()}
       >
@@ -744,9 +841,9 @@ export function Canvas({
           ))}
 
           <g id="ui-layer">
-            {selected && tool === 'select' && selected.id !== editingId && <SelectionOverlay o={selected} zoom={zoom} onGrip={onGrip} />}
+            {selected && tool === 'select' && selected.id !== editingId && <SelectionOverlay o={selected} zoom={zoom} onGrip={onGrip} coarse={coarsePointer} />}
             {selectedObjs.length > 1 && tool === 'select' && (
-              <MultiSelectionOverlay objs={selectedObjs} zoom={zoom} onRotateStart={onMultiRotate} />
+              <MultiSelectionOverlay objs={selectedObjs} zoom={zoom} onRotateStart={onMultiRotate} coarse={coarsePointer} />
             )}
             {marquee && (() => {
               const crossing = marquee.b.x < marquee.a.x
@@ -845,7 +942,9 @@ export function Canvas({
                 ))}
               </g>
             )}
-            {freehand && (
+            {freehand && pressures.current && pressures.current.length === freehand.length ? (
+              <PressureStroke points={freehand} pressures={pressures.current} width={drawStyle.strokeWidth} stroke={drawStyle.stroke} />
+            ) : freehand && (
               <polyline
                 points={freehand.map(p => `${p.x},${p.y}`).join(' ')}
                 fill="none" stroke={drawStyle.stroke} strokeWidth={drawStyle.strokeWidth}

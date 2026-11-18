@@ -60,12 +60,15 @@ export function useHistory<T>(initial: T | (() => T)) {
     }
     window.addEventListener('pointerdown', down, true)
     window.addEventListener('pointerup', up, true)
+    // tratto interrotto dal sistema (gesto della penna, finestra persa): vale come rilascio
+    window.addEventListener('pointercancel', up, true)
     window.addEventListener('blur', up)
     window.addEventListener('keydown', key, true)
     return () => {
       window.removeEventListener('keydown', key, true)
       window.removeEventListener('pointerdown', down, true)
       window.removeEventListener('pointerup', up, true)
+      window.removeEventListener('pointercancel', up, true)
       window.removeEventListener('blur', up)
     }
   }, [commit])

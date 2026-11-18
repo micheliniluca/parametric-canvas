@@ -20,12 +20,15 @@ type Props = {
   o: CanvasObject
   zoom: number
   onGrip: (e: ReactMouseEvent, grip: Grip) => void
+  /** Penna o dito: maniglie più grandi, più facili da prendere */
+  coarse?: boolean
 }
 
 /** Riquadro di selezione e maniglie, con dimensioni costanti a schermo. */
-export function SelectionOverlay({ o, zoom, onGrip }: Props) {
+export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   const k = 1 / zoom
-  const r = 5 * k
+  const r = (coarse ? 8 : 5) * k
+  const rotR0 = (coarse ? 9 : 6) * k
   const center = getObjectCenter(o)
   const rotation = o.rotation || 0
   const transform = rotation ? `rotate(${rotation}, ${center.x}, ${center.y})` : undefined
@@ -36,7 +39,7 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
       x={cx - r} y={cy - r} width={r * 2} height={r * 2} rx={1.5 * k}
       fill="white" stroke={ACCENT} strokeWidth={1.5 * k}
       style={{ cursor }}
-      onMouseDown={e => { e.stopPropagation(); onGrip(e, g) }}
+      onPointerDown={e => { e.stopPropagation(); onGrip(e, g) }}
     />
   )
 
@@ -133,9 +136,9 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
           />
           <circle
             cx={center.x + rotR * Math.cos(hAngle)} cy={center.y + rotR * Math.sin(hAngle)}
-            r={6 * k} fill="white" stroke={ACCENT} strokeWidth={2 * k}
+            r={rotR0} fill="white" stroke={ACCENT} strokeWidth={2 * k}
             style={{ cursor: 'grab' }}
-            onMouseDown={e => { e.stopPropagation(); onGrip(e, { kind: 'rotate' }) }}
+            onPointerDown={e => { e.stopPropagation(); onGrip(e, { kind: 'rotate' }) }}
           >
             <title>Ruota (Shift = passi di 15°)</title>
           </circle>
@@ -156,10 +159,11 @@ export function SelectionOverlay({ o, zoom, onGrip }: Props) {
 }
 
 /** Più oggetti selezionati: contorno di ciascuno, riquadro complessivo e maniglia di rotazione */
-export function MultiSelectionOverlay({ objs, zoom, onRotateStart }: {
+export function MultiSelectionOverlay({ objs, zoom, onRotateStart, coarse }: {
   objs: CanvasObject[]
   zoom: number
   onRotateStart: (e: ReactMouseEvent, center: Point) => void
+  coarse?: boolean
 }) {
   const k = 1 / zoom
   const u = unionBounds(objs)
@@ -185,8 +189,8 @@ export function MultiSelectionOverlay({ objs, zoom, onRotateStart }: {
         <>
           <line x1={c.x} y1={u.minY - pad} x2={c.x} y2={hy} stroke={ACCENT} strokeOpacity={0.35} strokeWidth={1 * k} pointerEvents="none" />
           <circle
-            cx={c.x} cy={hy} r={6 * k} fill="white" stroke={ACCENT} strokeWidth={2 * k} style={{ cursor: 'grab' }}
-            onMouseDown={e => { e.stopPropagation(); onRotateStart(e, c) }}
+            cx={c.x} cy={hy} r={(coarse ? 9 : 6) * k} fill="white" stroke={ACCENT} strokeWidth={2 * k} style={{ cursor: 'grab' }}
+            onPointerDown={e => { e.stopPropagation(); onRotateStart(e, c) }}
           >
             <title>Ruota la selezione (Shift = passi di 15°)</title>
           </circle>

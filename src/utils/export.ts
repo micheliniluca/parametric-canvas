@@ -4,6 +4,7 @@ import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
+import { weldDrawing } from './weldUtils'
 import { getObjectBounds, getObjectCenter, rotatePoint, textSize } from '../canvas/geometry'
 import { pathToPolylines } from './pathToPolylines'
 
@@ -11,10 +12,10 @@ import { pathToPolylines } from './pathToPolylines'
  * Esportazione DXF (formato R12, letto da AutoCAD, Tekla, LibreCAD, BricsCAD…).
  * Unità: millimetri, 1 unità della tela = 1 mm. L'asse Y viene ribaltato (in DXF cresce verso l'alto).
  * Un layer per tipo di oggetto; il colore del tratto viene convertito nel colore AutoCAD (ACI) più vicino.
- * Le immagini e i riempimenti non vengono esportati.
+ * Le immagini e i riempimenti non vengono esportati, tranne le campiture piene delle saldature (SOLID).
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'NASCOSTE' | 'ASSI'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'NASCOSTE' | 'ASSI'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -27,6 +28,7 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'LAMIERE', color: 5, ltype: 'CONTINUOUS' },
   { name: 'CALCESTRUZZO', color: 8, ltype: 'CONTINUOUS' },
   { name: 'PIOLI', color: 2, ltype: 'CONTINUOUS' },
+  { name: 'SALDATURE', color: 30, ltype: 'CONTINUOUS' },
   { name: 'NASCOSTE', color: 8, ltype: 'DASHED' },
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
 ]
@@ -34,6 +36,8 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
 type Ent =
   | { kind: 'poly'; layer: Layer; color: number; pts: Point[]; closed: boolean }
   | { kind: 'circle'; layer: Layer; color: number; c: Point; r: number }
+  /** triangolo pieno (SOLID) */
+  | { kind: 'solid'; layer: Layer; color: number; pts: [Point, Point, Point] }
   | {
       kind: 'text'; layer: Layer; color: number; p: Point; height: number; text: string
       /** gradi, come sulla tela (orari) */
@@ -85,6 +89,34 @@ export function toAci(hex?: string): number {
 
 /* ---------- oggetti → entità ---------- */
 
+/** Triangoli di un poligono semplice (ear clipping), per le campiture piene */
+export function triangulate(poly: Point[]): [Point, Point, Point][] {
+  const pts = poly.slice()
+  if (pts.length > 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-9) pts.pop()
+  const area = pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p.x * q.y - q.x * p.y }, 0)
+  if (area < 0) pts.reverse()
+  const cross = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const inside = (p: Point, a: Point, b: Point, c: Point) =>
+    cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0
+  const out: [Point, Point, Point][] = []
+  let guard = pts.length * pts.length
+  while (pts.length > 3 && guard-- > 0) {
+    let cut = false
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[(i + pts.length - 1) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length]
+      if (cross(a, b, c) <= 1e-12) continue
+      if (pts.some(p => p !== a && p !== b && p !== c && inside(p, a, b, c))) continue
+      out.push([a, b, c])
+      pts.splice(i, 1)
+      cut = true
+      break
+    }
+    if (!cut) break
+  }
+  if (pts.length === 3) out.push([pts[0], pts[1], pts[2]])
+  return out
+}
+
 /** Altezza del testo DXF (altezza delle maiuscole) rispetto alla dimensione del carattere sulla tela */
 const CAP = 0.7
 
@@ -101,6 +133,9 @@ function entitiesOf(o: CanvasObject): Ent[] {
   const path = (layer: Layer, d: string | undefined, local: (p: Point) => Point = p => p) => {
     if (!d) return
     for (const pl of pathToPolylines(d)) poly(layer, pl.pts.map(local), pl.closed)
+  }
+  const fill = (layer: Layer, polygon: Point[]) => {
+    for (const t of triangulate(polygon)) out.push({ kind: 'solid', layer, color, pts: [R(t[0]), R(t[1]), R(t[2])] })
   }
   const text = (layer: Layer, p: Point, fontSize: number, t: string, rot: number,
     align: 'left' | 'center', valign: 'baseline' | 'middle', c = color) => {
@@ -237,6 +272,22 @@ function entitiesOf(o: CanvasObject): Ent[] {
       break
     }
 
+    case 'weld': {
+      const dr = weldDrawing(o)
+      path('SALDATURE', dr.lines)
+      path('NASCOSTE', dr.dashed)
+      for (const pl of pathToPolylines(dr.solid)) { poly('SALDATURE', pl.pts, true); fill('SALDATURE', pl.pts) }
+      for (const b of dr.bead) { poly('SALDATURE', b, true); fill('SALDATURE', b) }
+      if (dr.ring) out.push({ kind: 'circle', layer: 'SALDATURE', color, c: dr.ring.c, r: dr.ring.r })
+      for (const t of dr.texts) {
+        // la tela usa l'ancoraggio orizzontale start/end: in DXF si allinea a sinistra stimando la larghezza
+        const w = t.text.length * 0.6 * dr.fontSize
+        const x = t.anchor === 'end' ? t.x - w : t.anchor === 'middle' ? t.x - w / 2 : t.x
+        text('SALDATURE', { x, y: t.y }, dr.fontSize, t.text, 0, 'left', 'middle')
+      }
+      break
+    }
+
     case 'image':
       // le immagini non hanno un equivalente vettoriale
       break
@@ -268,7 +319,7 @@ export function exportToDXF(objects: CanvasObject[]): string {
     minY = Math.min(minY, Y(p.y) - r); maxY = Math.max(maxY, Y(p.y) + r)
   }
   for (const e of ents) {
-    if (e.kind === 'poly') e.pts.forEach(p => grow(p))
+    if (e.kind === 'poly' || e.kind === 'solid') e.pts.forEach(p => grow(p))
     else if (e.kind === 'circle') grow(e.c, e.r)
     else grow(e.p)
   }
@@ -317,6 +368,14 @@ export function exportToDXF(objects: CanvasObject[]): string {
         g(0, 'VERTEX'); g(8, e.layer); g(10, n(p.x)); g(20, n(Y(p.y))); g(30, 0)
       }
       g(0, 'SEQEND'); g(8, e.layer)
+    } else if (e.kind === 'solid') {
+      // SOLID a tre vertici: il quarto coincide col terzo
+      const [a, b, c] = e.pts
+      g(0, 'SOLID'); g(8, e.layer); g(62, e.color)
+      g(10, n(a.x)); g(20, n(Y(a.y))); g(30, 0)
+      g(11, n(b.x)); g(21, n(Y(b.y))); g(31, 0)
+      g(12, n(c.x)); g(22, n(Y(c.y))); g(32, 0)
+      g(13, n(c.x)); g(23, n(Y(c.y))); g(33, 0)
     } else if (e.kind === 'circle') {
       g(0, 'CIRCLE'); g(8, e.layer); g(62, e.color); g(10, n(e.c.x)); g(20, n(Y(e.c.y))); g(30, 0); g(40, n(e.r))
     } else {

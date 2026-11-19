@@ -5,6 +5,7 @@ import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUtils'
 import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
+import { weldDrawing } from '../utils/weldUtils'
 import { dashArray } from '../style'
 import { getObjectBounds, getObjectCenter, textSize } from './geometry'
 
@@ -303,6 +304,39 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
               {deckLabel(o)}
             </text>
           )}
+        </g>
+      )
+    }
+
+    case 'weld': {
+      const sw = o.strokeWidth ?? 1
+      const dr = weldDrawing(o)
+      return (
+        <g onPointerDown={down}>
+          <path d={dr.hit} fill="none" stroke="transparent" strokeWidth={14} vectorEffect="non-scaling-stroke"
+            pointerEvents={interactive ? 'stroke' : 'none'} />
+          {dr.bead.length > 0 && (
+            <path d={dr.bead.map(pl => `M ${pl.map(p => `${p.x} ${p.y}`).join(' L ')} Z`).join(' ')}
+              fill={stroke} stroke={stroke} strokeWidth={sw * 0.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+              pointerEvents={pe} />
+          )}
+          <path d={dr.lines} fill="none" stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" />
+          {dr.dashed && (
+            <path d={dr.dashed} fill="none" stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+              strokeDasharray="6 3" pointerEvents="none" />
+          )}
+          <path d={dr.solid} fill={stroke} stroke="none" pointerEvents="none" />
+          {dr.ring && (
+            <circle cx={dr.ring.c.x} cy={dr.ring.c.y} r={dr.ring.r} fill="none" stroke={stroke} strokeWidth={sw}
+              vectorEffect="non-scaling-stroke" pointerEvents="none" />
+          )}
+          {dr.texts.map((t, i) => (
+            <text key={i} x={t.x} y={t.y} fontSize={dr.fontSize} fill={stroke} textAnchor={t.anchor}
+              dominantBaseline="central" pointerEvents="none" style={{ userSelect: 'none' }}>
+              {t.text}
+            </text>
+          ))}
         </g>
       )
     }

@@ -1,9 +1,10 @@
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { CanvasObject } from '../types'
-import { getObjectBounds, getObjectCenter, rotatePoint, textSize, unionBounds, worldBounds } from './geometry'
+import { getObjectBounds, getObjectCenter, isEndpoint, rotatePoint, textSize, unionBounds, worldBounds } from './geometry'
 import type { Point } from '../types'
 import { round1 } from '../utils/mathUtils'
 import { ttfSocket } from '../utils/cableUtils'
+import { weldLabel } from '../utils/weldUtils'
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br'
 export type Grip =
@@ -44,7 +45,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   )
 
   const locked = !!o.locked
-  const isEndpointType = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck'
+  const isEndpointType = isEndpoint(o)
   const showVertices = !locked && o.type === 'polyline' && o.points.length <= MAX_VERTEX_GRIPS
   const showBox = locked || (!isEndpointType && !showVertices)
   const b = getObjectBounds(o)
@@ -60,6 +61,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   else if (o.type === 'circle') parts.push(`Ø ${round1(o.radius * 2)}`)
   else if (o.type === 'bolt') parts.push(`M${o.diameter}${o.cols * (o.view === 'section' ? 1 : o.rows) > 1 ? ` · ${o.cols}×${o.view === 'section' ? 1 : o.rows}` : ''}`)
   else if (o.type === 'deck') parts.push(`${o.view === 'side' ? 'L' : 'B'} ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
+  else if (o.type === 'weld') parts.push(weldLabel(o))
   else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)

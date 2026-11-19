@@ -41,6 +41,15 @@ export const IconDeck = ({ size }: Props) => (
   </Svg>
 )
 
+/** Simbolo di saldatura: freccia, linea di riferimento e cordone d'angolo */
+export const IconWeld = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 3 21 L 10 12 H 22" strokeWidth={1.5} />
+    <path d="M 3 21 L 3.6 17.4 L 6.2 19.4 Z" fill="currentColor" strokeWidth={1} />
+    <path d="M 13.5 12 V 5.5 L 20 12" strokeWidth={1.5} strokeLinejoin="round" />
+  </Svg>
+)
+
 /** Sezione di una trave IPE con raccordi */
 export const IconIPE = ({ size }: Props) => (
   <Svg size={size}>

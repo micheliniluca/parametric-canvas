@@ -7,7 +7,7 @@ import type { DrawStyle } from './style'
 import { dashArray } from './style'
 import { round1 } from './utils/mathUtils'
 import {
-  applyOrtho, dist, getObjectBounds, getObjectCenter, getSnapPoint,
+  applyOrtho, dist, getObjectBounds, getObjectCenter, getSnapPoint, isEndpoint,
   rotatePoint, scaleObject, translateObject, worldBounds, expandGroups, rotateObjectAround,
 } from './canvas/geometry'
 import { ObjectView, PressureStroke } from './canvas/ObjectView'
@@ -18,6 +18,7 @@ import { TextEditor } from './canvas/TextEditor'
 import { findProfile } from './profiles'
 import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
 import { DEFAULT_DECK, deckProfile } from './utils/deckUtils'
+import { defaultBeadRot } from './utils/weldUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -236,6 +237,23 @@ export function Canvas({
     }
   }
 
+  // una nuova saldatura riprende norma, tipo, lato e quote dell'ultima; il cordone si orienta verso la linea
+  const makeWeld = (tip: Point, knee: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'weld')
+    const prev = last?.type === 'weld' ? last : null
+    const kind = prev?.kind ?? 'fillet'
+    return {
+      id: crypto.randomUUID(), type: 'weld', x: 0, y: 0, x1: tip.x, y1: tip.y, x2: knee.x, y2: knee.y,
+      standard: prev?.standard ?? 'iso', kind, side: prev?.side ?? 'arrow',
+      size: prev?.size ?? 5, sizeRef: prev?.sizeRef ?? 'a', length: prev?.length ?? 0,
+      count: prev?.count ?? 0, gap: prev?.gap ?? 0, staggered: prev?.staggered ?? false,
+      allAround: prev?.allAround ?? false, field: prev?.field ?? false, contour: prev?.contour ?? 'none',
+      process: prev?.process ?? '', showBead: prev?.showBead ?? true, plate: prev?.plate ?? 10,
+      beadRot: defaultBeadRot(kind, tip, knee), beadFlip: false, textSize: prev?.textSize ?? 14,
+      stroke: drawStyle.stroke, strokeWidth: 1,
+    }
+  }
+
   const makeProfile = (code: string, series: string, p: Point): CanvasObject => ({
     id: crypto.randomUUID(), type: 'profile', profileType: series, profileName: code,
     x: p.x, y: p.y, scale: 1, viewType: 'front', length: 1000,
@@ -441,6 +459,7 @@ export function Canvas({
       case 'quote':
       case 'cable':
       case 'deck':
+      case 'weld':
       case 'measure':
       case 'scale': {
         const p = pick(e, segment?.p1)
@@ -514,6 +533,8 @@ export function Canvas({
       addObject(makeCable(s.p1, s.p2))
     } else if (tool === 'deck') {
       addObject(makeDeck(s.p1, s.p2))
+    } else if (tool === 'weld') {
+      addObject(makeWeld(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -573,7 +594,7 @@ export function Canvas({
 
     // Anteprime degli strumenti a clic
     if (!a) {
-      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'measure' || tool === 'scale')) {
+      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -678,7 +699,7 @@ export function Canvas({
 
       case 'end':
         updateObject(a.id, o => {
-          if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck') {
+          if (isEndpoint(o)) {
             const other = a.end === 'p1' ? { x: o.x2, y: o.y2 } : { x: o.x1, y: o.y1 }
             const p = pick(e, other, a.id)
             return a.end === 'p1' ? { ...o, x1: p.x, y1: p.y } : { ...o, x2: p.x, y2: p.y }
@@ -934,7 +955,12 @@ export function Canvas({
                 <ObjectView o={makeDeck(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
               </g>
             )}
-            {segment && tool !== 'line' && tool !== 'rect' && tool !== 'circle' && (
+            {segment && tool === 'weld' && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={makeWeld(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
+            {segment && tool !== 'line' && tool !== 'rect' && tool !== 'circle' && tool !== 'weld' && (
               <g pointerEvents="none">
                 <line x1={segment.p1.x} y1={segment.p1.y} x2={segment.p2.x} y2={segment.p2.y}
                   {...draftStroke} stroke={tool === 'measure' ? '#dc2626' : tool === 'scale' ? '#f59e0b' : ACCENT} />

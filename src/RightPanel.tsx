@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, DeckObject } from './types'
+import type { CableObject, CanvasObject, DeckObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { findProfile, profilesOfSeries, seriesByShape, useCatalog } from './profiles'
@@ -14,6 +14,9 @@ import {
   DECKS, STUD_SIZES, deckLabel, deckLength, deckProfile, deckSheets, deckSpan, deckSteelMass, deckThickness, deckWidth,
   slabVolume, studCount, studSpec,
 } from './utils/deckUtils'
+import {
+  WELD_KINDS, WELD_PROCESSES, defaultBeadRot, filletLeg, filletThroat, isButt, weldLabel,
+} from './utils/weldUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
@@ -24,7 +27,7 @@ import {
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
 } from 'lucide-react'
 import type { AlignKind } from './canvas/geometry'
-import { textSize } from './canvas/geometry'
+import { isEndpoint, textSize } from './canvas/geometry'
 
 type Props = {
   selected: CanvasObject | null
@@ -53,7 +56,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
-  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata',
+  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -298,6 +301,158 @@ function CableProps({ o, onChange }: { o: CableObject; onChange: (patch: Partial
 }
 
 /** Lamiera grecata: profilo, spessore, vista, larghezza/lunghezza, getto */
+function WeldProps({ o, onChange }: { o: WeldObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const iso = o.standard === 'iso'
+  const butt = isButt(o)
+  const r05 = (v: number) => Math.round(v * 2) / 2
+  // cambiando norma il cordone resta lo stesso: in AWS si indica il lato, in ISO la gola
+  const setStandard = (standard: WeldObject['standard']) => {
+    if (standard === o.standard) return
+    if (butt || !(o.size > 0)) return onChange({ standard })
+    onChange(standard === 'aws'
+      ? { standard, size: r05(filletLeg(o)) }
+      : { standard, sizeRef: 'a', size: r05(filletLeg(o) / Math.SQRT2) })
+  }
+  // passando tra angolo e testa a testa cambia il significato dell'orientamento
+  const setKind = (kind: WeldObject['kind']) => {
+    const patch: Partial<WeldObject> = { kind }
+    if ((kind === 'fillet') !== (o.kind === 'fillet')) {
+      patch.beadRot = defaultBeadRot(kind, { x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 })
+      patch.beadFlip = false
+      patch.size = kind === 'fillet' ? 5 : 0
+    }
+    onChange(patch as Partial<CanvasObject>)
+  }
+  const setSizeRef = (sizeRef: 'a' | 'z') => {
+    if (sizeRef === (o.sizeRef ?? 'a')) return
+    const z = filletLeg(o)
+    onChange({ sizeRef, size: o.size > 0 ? r05(sizeRef === 'a' ? z / Math.SQRT2 : z) : 0 })
+  }
+  const n = o.count ?? 0
+  const both = o.side === 'both'
+  const sizeLabel = butt ? (iso ? 'Penetrazione s (mm)' : 'Profondità (mm)') : iso ? `${o.sizeRef ?? 'a'} (mm)` : 'Lato (mm)'
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{weldLabel(o)}</div>
+        <div className="muted">
+          {iso ? 'ISO 2553 (sistema A)' : 'AWS A2.4'}
+          {!butt && <> · gola a {round1(filletThroat(o))} · lato z {round1(filletLeg(o))} mm</>}
+        </div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Norma" full>
+          <div className="segmented">
+            {([['iso', 'ISO 2553'], ['aws', 'AWS A2.4']] as const).map(([v, l]) => (
+              <button key={v} type="button" className={o.standard === v ? 'active' : ''} onClick={() => setStandard(v)}>{l}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Tipo" full>
+          <select value={o.kind} onChange={e => setKind(e.target.value as WeldObject['kind'])}>
+            {WELD_KINDS.map(k => <option key={k.id} value={k.id}>{both ? k.both : k.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Lato" full>
+          <div className="segmented">
+            {([['arrow', 'Lato freccia'], ['other', 'Lato opposto'], ['both', 'Entrambi']] as const).map(([v, l]) => (
+              <button key={v} type="button" className={o.side === v ? 'active' : ''} onClick={() => onChange({ side: v })}>{l}</button>
+            ))}
+          </div>
+        </Field>
+      </div>
+
+      <h4>Quote</h4>
+      <div className="prop-grid">
+        {!butt && iso && (
+          <Field label="Quota">
+            <select value={o.sizeRef ?? 'a'} onChange={e => setSizeRef(e.target.value as 'a' | 'z')}>
+              <option value="a">a · gola</option>
+              <option value="z">z · lato</option>
+            </select>
+          </Field>
+        )}
+        <Field label={sizeLabel}>
+          <Num value={o.size} min={0} onChange={v => onChange({ size: v })} />
+        </Field>
+        <Field label="Lunghezza l (mm)">
+          <Num value={o.length ?? 0} min={0} onChange={v => onChange({ length: v })} />
+        </Field>
+        <Field label="Tratti n">
+          <Num value={n} min={0} onChange={v => onChange({ count: Math.round(v) })} />
+        </Field>
+        {n > 1 && (
+          <Field label={iso ? 'Distanza e (mm)' : 'Interspazio (mm)'}>
+            <Num value={o.gap ?? 0} min={0} onChange={v => onChange({ gap: v })} />
+          </Field>
+        )}
+        {n > 1 && both && (
+          <label className="check-label">
+            <input type="checkbox" checked={!!o.staggered} onChange={e => onChange({ staggered: e.target.checked })} />
+            Tratti sfalsati
+          </label>
+        )}
+        <p className="muted full-width" style={{ margin: 0 }}>
+          0 = quota non indicata. {n > 1
+            ? (iso ? 'A tratti: n × l (e).' : 'A tratti: lunghezza-passo.')
+            : 'Con 2 o più tratti il cordone diventa a tratti.'}
+        </p>
+      </div>
+
+      <h4>Simboli</h4>
+      <div className="prop-grid">
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.allAround} onChange={e => onChange({ allAround: e.target.checked })} />
+          Tutto intorno
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.field} onChange={e => onChange({ field: e.target.checked })} />
+          In opera
+        </label>
+        <Field label="Finitura">
+          <select value={o.contour ?? 'none'} onChange={e => onChange({ contour: e.target.value as WeldObject['contour'] })}>
+            <option value="none">—</option>
+            <option value="flat">Piana</option>
+            <option value="convex">Convessa</option>
+            <option value="concave">Concava</option>
+          </select>
+        </Field>
+        <Field label="Procedimento">
+          <input list="weld-processes" value={o.process ?? ''} placeholder="135"
+            onChange={e => onChange({ process: e.target.value })} />
+          <datalist id="weld-processes">
+            {WELD_PROCESSES.filter(p => p.code).map(p => <option key={p.code} value={p.code}>{p.label}</option>)}
+          </datalist>
+        </Field>
+      </div>
+
+      <h4>Cordone in sezione</h4>
+      <div className="prop-grid">
+        <label className="check-label full-width">
+          <input type="checkbox" checked={!!o.showBead} onChange={e => onChange({ showBead: e.target.checked })} />
+          Mostra il cordone sulla punta della freccia (pieno, in scala)
+        </label>
+        {o.showBead && (butt || both) && (
+          <Field label={butt ? 'Spessore lamiera t (mm)' : 'Spessore anima t (mm)'}>
+            <Num value={o.plate ?? 10} min={1} onChange={v => onChange({ plate: v })} />
+          </Field>
+        )}
+        {o.showBead && (
+          <div className="full-width" style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="btn-secondary" style={{ flex: 1 }}
+              onClick={() => onChange({ beadRot: ((o.beadRot ?? 0) + 1) % 4 })}>Ruota 90°</button>
+            <button type="button" className="btn-secondary" style={{ flex: 1 }}
+              onClick={() => onChange({ beadFlip: !o.beadFlip })}>Specchia</button>
+          </div>
+        )}
+        <Field label="Altezza testo">
+          <Num value={o.textSize ?? 14} min={1} onChange={v => onChange({ textSize: v })} />
+        </Field>
+      </div>
+    </>
+  )
+}
+
 function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   const p = deckProfile(o.profile)
   const t = deckThickness(o)
@@ -583,9 +738,9 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
 
 function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   useCatalog()
-  const isEndpoint = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck'
-  const hasXY = o.type !== 'polyline' && !isEndpoint
-  const canRotate = !isEndpoint
+  const endpoint = isEndpoint(o)
+  const hasXY = o.type !== 'polyline' && !endpoint
+  const canRotate = !endpoint
 
   return (
     <div className="properties-form">
@@ -742,6 +897,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
 
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
+      {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
 
       {o.type === 'image' && o.clipPoints && (
         <div className="prop-grid">
@@ -772,7 +928,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {o.type === 'circle' && (
           <Field label="Diametro"><Num value={o.radius * 2} min={1} onChange={v => onChange({ radius: v / 2 })} /></Field>
         )}
-        {isEndpoint && (
+        {endpoint && (
           <>
             <Field label="X1"><Num value={o.x1} onChange={v => onChange({ x1: v })} /></Field>
             <Field label="Y1"><Num value={o.y1} onChange={v => onChange({ y1: v })} /></Field>

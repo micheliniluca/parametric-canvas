@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { IconBolt, IconCable, IconDeck, IconDimension, IconIPE } from './icons'
+import { IconBolt, IconCable, IconDeck, IconDimension, IconIPE, IconWeld } from './icons'
 import {
   MousePointer2,
   Minus,
@@ -34,6 +34,7 @@ export type ToolId =
   | 'bolt'
   | 'cable'
   | 'deck'
+  | 'weld'
   | 'quote'
   | 'measure'
   | 'scale'
@@ -68,6 +69,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
   cable: { id: 'cable', label: 'Cavo FLC con forcelle', icon: IconCable, shortcut: 'F', hint: 'Clic sul primo perno (estremità A), clic sul secondo (B). Ctrl = snap. Taglia e forcelle nel pannello' },
   deck: { id: 'deck', label: 'Lamiera grecata', icon: IconDeck, shortcut: 'H', hint: 'Clic sul punto iniziale e sul punto finale dell\'appoggio: la linea è la larghezza della lamiera. Profilo, vista e getto nel pannello' },
+  weld: { id: 'weld', label: 'Saldatura', icon: IconWeld, shortcut: 'W', hint: 'Clic sul giunto (punta della freccia), poi dove va la linea di riferimento. Norma, tipo, quote e cordone nel pannello' },
   quote: { id: 'quote', label: 'Quota', icon: IconDimension, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
   measure: { id: 'measure', label: 'Misura', icon: Ruler, shortcut: 'M', hint: 'Clic su due punti per misurare la distanza' },
   scale: { id: 'scale', label: 'Scala con due punti', icon: Maximize, shortcut: 'K', keepSelection: true, hint: 'Clic su due punti di distanza nota dell\'immagine (o dell\'oggetto selezionato), poi inserisci la misura reale' },
@@ -78,5 +80,5 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 /** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
-  t === 'bolt' || t === 'cable' || t === 'deck' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'bolt' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'quote' || t === 'measure' || t === 'scale' ||
   t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

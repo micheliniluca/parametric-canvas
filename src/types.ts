@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld'
   x: number
   y: number
   stroke?: string
@@ -179,6 +179,45 @@ export type DeckObject = BaseObject & {
   showLabel?: boolean
 }
 
+/**
+ * Simbolo di saldatura (ISO 2553 sistema A o AWS A2.4) con cordone in sezione opzionale.
+ * (x1, y1) = punta della freccia sul giunto; (x2, y2) = inizio della linea di riferimento.
+ */
+export type WeldObject = BaseObject & {
+  type: 'weld'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  standard: 'iso' | 'aws'
+  /** Simbolo elementare; sui due lati V → X, mezza V → K */
+  kind: 'fillet' | 'I' | 'V' | 'bevel' | 'Y' | 'bevelY' | 'U' | 'J'
+  side: 'arrow' | 'other' | 'both'
+  /** ISO angolo: a (gola) o z (lato); testa a testa: s (penetrazione); AWS: lato o profondità. 0 = non indicata */
+  size: number
+  sizeRef?: 'a' | 'z'
+  /** Lunghezza del cordone (mm); 0 = non indicata */
+  length?: number
+  /** Cordone a tratti: numero di tratti (n) e distanza tra i tratti (e) */
+  count?: number
+  gap?: number
+  staggered?: boolean
+  allAround?: boolean
+  field?: boolean
+  contour?: 'none' | 'flat' | 'convex' | 'concave'
+  /** Procedimento nella coda (ISO 4063 o sigla AWS) */
+  process?: string
+  /** Disegna il cordone in sezione sulla punta della freccia, in scala reale */
+  showBead?: boolean
+  /** Spessore della lamiera (testa a testa) o dell'anima (angolo su due lati), mm */
+  plate?: number
+  /** Orientamento del cordone: quarti di giro in senso orario e specchiatura */
+  beadRot?: number
+  beadFlip?: boolean
+  /** Altezza del testo del simbolo (mm sulla tela) */
+  textSize?: number
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -190,4 +229,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject

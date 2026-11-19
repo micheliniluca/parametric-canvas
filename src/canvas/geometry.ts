@@ -106,6 +106,8 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     case 'deck':
     case 'weld':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
+    case 'text':
+      return { ...o, x: o.x + dx, y: o.y + dy, leader: o.leader && mv(o.leader) }
     default:
       return { ...o, x: o.x + dx, y: o.y + dy }
   }
@@ -138,6 +140,7 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
         ...obj, ...sp(obj), fontSize: obj.fontSize * sf,
         width: obj.width ? obj.width * sf : obj.width,
         height: obj.height ? obj.height * sf : obj.height,
+        leader: obj.leader && sp(obj.leader),
       }
     case 'profile':
       return { ...obj, ...sp(obj), scale: obj.scale * sf }

@@ -28,8 +28,8 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   padding: 0 12px;
-  background: white;
-  border-bottom: 1px solid var(--border-color);
+  background: var(--navy);
+  color: white;
   z-index: 50;
 }
 
@@ -40,24 +40,32 @@ button:disabled {
 }
 
 .tb-center {
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
   padding: 3px;
+}
+
+.tb-logo {
+  color: white;
+  margin: 0 12px 0 2px;
 }
 
 .tb-brand {
   font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--text-main);
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  color: white;
   margin-right: 10px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid var(--accent);
   white-space: nowrap;
 }
 
 .tb-sep {
   width: 1px;
   height: 22px;
-  background: var(--border-color);
+  background: rgba(255, 255, 255, 0.18);
   margin: 0 6px;
 }
 
@@ -67,12 +75,12 @@ button:disabled {
   padding: 0;
   border: none;
   background: transparent;
-  color: #475569;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .tb-btn:hover:not(:disabled) {
-  background: #e2e8f0;
-  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.10);
+  color: white;
 }
 
 .tb-btn.active,
@@ -166,7 +174,7 @@ button:disabled {
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(10, 22, 40, 0.15);
   flex-shrink: 0;
 }
 
@@ -180,7 +188,7 @@ button:disabled {
 
 .sb-none {
   background: white;
-  color: #94a3b8;
+  color: var(--text-faint);
 }
 
 .sb-custom {
@@ -205,15 +213,15 @@ button:disabled {
   padding: 0;
   border: none;
   background: transparent;
-  color: #334155;
+  color: var(--text-soft);
 }
 
 .sb-btn:hover {
-  background: #f1f5f9;
+  background: var(--surface-alt);
 }
 
 .sb-btn.active {
-  background: #e0e7ff;
+  background: var(--primary-soft);
   color: var(--primary);
 }
 
@@ -248,7 +256,7 @@ button:disabled {
   padding: 0 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-faint);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -256,13 +264,13 @@ button:disabled {
 }
 
 .st-toggle:hover {
-  background: #f1f5f9;
+  background: var(--surface-alt);
 }
 
 .st-toggle.on {
   color: var(--primary);
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
 }
 
 .st-grid {
@@ -310,7 +318,7 @@ button:disabled {
 }
 
 .st-icon:hover {
-  background: #f1f5f9;
+  background: var(--surface-alt);
   color: var(--text-main);
 }
 
@@ -322,14 +330,14 @@ button:disabled {
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  color: #94a3b8;
+  color: var(--text-faint);
   font-size: 0.95rem;
   line-height: 1.6;
   pointer-events: none;
 }
 
 .empty-hint b {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .toast {
@@ -337,7 +345,7 @@ button:disabled {
   bottom: 44px;
   left: 50%;
   transform: translateX(-50%);
-  background: #0f172a;
+  background: var(--navy);
   color: white;
   padding: 8px 14px;
   border-radius: 8px;
@@ -428,7 +436,7 @@ button:disabled {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: #f1f5f9;
+  background: var(--surface-alt);
   color: var(--text-muted);
 }
 
@@ -462,9 +470,9 @@ button:disabled {
 }
 
 .btn-danger {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--danger);
 }
 
 .wide {
@@ -507,6 +515,15 @@ button:disabled {
   box-shadow: var(--shadow-sm);
 }
 
+.rp-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--border-color);
+  color: var(--navy);
+}
+
 .rp-content {
   flex: 1;
   overflow-y: auto;
@@ -514,14 +531,20 @@ button:disabled {
 }
 
 .rp-content h4 {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  color: var(--text-soft);
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border-color);
+}
+
+/* sottolineatura oro sotto la sola parola, come le etichette di sezione Maffeis */
+.rp-content h4::first-line {
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 5px;
 }
 
 .muted {
@@ -542,12 +565,12 @@ button:disabled {
 }
 
 .badge {
-  background: #eef2ff;
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
 }
 
 .prop-grid {
@@ -603,7 +626,7 @@ button:disabled {
   align-items: center;
   text-align: center;
   padding: 40px 12px;
-  color: #94a3b8;
+  color: var(--text-faint);
   font-size: 0.85rem;
   gap: 4px;
 }
@@ -688,7 +711,7 @@ button:disabled {
   padding: 7px 10px;
   font-size: 0.83rem;
   cursor: pointer;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--surface-alt);
 }
 
 .catalog-item:last-child {
@@ -696,7 +719,7 @@ button:disabled {
 }
 
 .catalog-item:hover {
-  background: #eef2ff;
+  background: var(--primary-soft);
   color: var(--primary);
 }
 
@@ -771,7 +794,7 @@ button:disabled {
 }
 
 .catalog-item.current {
-  background: #eef2ff;
+  background: var(--primary-soft);
 }
 
 .catalog-code {
@@ -812,7 +835,7 @@ button:disabled {
 }
 
 .code-chip span {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -829,11 +852,11 @@ button:disabled {
   gap: 2px;
   margin-bottom: 8px;
   padding: 8px 10px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
   border-radius: 8px;
   font-size: 0.8rem;
-  color: #3730a3;
+  color: var(--primary-ink);
 }
 
 .placing-banner span {
@@ -876,7 +899,7 @@ button:disabled {
   padding: 0;
   border: 1px solid var(--border-color);
   background: white;
-  color: #334155;
+  color: var(--text-soft);
 }
 
 .align-btn:hover:not(:disabled) {
@@ -946,5 +969,5 @@ button:disabled {
 
 .warn-text {
   font-size: 0.75rem;
-  color: #b45309;
+  color: var(--warn);
 }

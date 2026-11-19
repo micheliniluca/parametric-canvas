@@ -29,6 +29,8 @@ export type QuoteObject = BaseObject & {
   y2: number
   text?: string // Custom text override
   textColor?: string
+  /** Terminali alle estremità: frecce (predefinite) o trattini obliqui */
+  ends?: 'arrow' | 'tick'
 }
 
 export type RectObject = BaseObject & {
@@ -51,6 +53,10 @@ export type TextObject = BaseObject & {
   boxPadding: number
   width?: number // Optional manual sizing
   height?: number
+  /** Punta della linea di richiamo (coordinate mondo); assente = senza richiamo */
+  leader?: Point
+  /** Terminale della linea di richiamo */
+  leaderEnd?: 'arrow' | 'dot' | 'none'
 }
 
 export type ProfileObject = BaseObject & {

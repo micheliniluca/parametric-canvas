@@ -29,7 +29,7 @@ npm run dev
 | D | Mano libera (resta attiva, Esc per uscire) |
 | L / P / A | Linea / Polilinea / Freccia |
 | R / C | Rettangolo / Cerchio (trascina; Shift = quadrato) |
-| T | Testo: clic e scrivi; doppio clic su un testo per modificarlo |
+| T | Testo: clic e scrivi; doppio clic su un testo per modificarlo; linea di richiamo dal pannello, con la punta trascinabile |
 | I | Profilo: scegli nel catalogo (si apre da solo) e clicca sulla tela per inserirlo |
 | N | Bollino numerato: ogni clic sulla tela aggiunge il numero successivo, fino a Esc o a un altro strumento |
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
@@ -38,7 +38,7 @@ npm run dev
 | H | Lamiera grecata (ComFlor 46, 60, 80, 100): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | W | Saldatura (ISO 2553 o AWS A2.4): clic sul giunto, clic dove va la linea di riferimento; tipo (angolo, I, V, mezza V, Y, mezza Y, U, J; su due lati X, K…), lato, quote, a tratti, tutto intorno, in opera, finitura, procedimento; cordone pieno in scala sulla punta della freccia |
-| Q / M | Quota / Misura |
+| Q / M | Quota (frecce o trattino obliquo alle estremità, nel pannello) / Misura |
 | S / O / G | Attiva SNAP / ORTO / GRIGLIA |
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |
 | Ctrl+Z / Ctrl+Y | Annulla / Ripeti |

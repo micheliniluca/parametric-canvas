@@ -6,6 +6,8 @@ import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUt
 import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
 import { weldDrawing } from '../utils/weldUtils'
+import { leaderTerminal, textLeader } from '../utils/leaderUtils'
+import { quoteTerminals } from '../utils/quoteUtils'
 import { dashArray } from '../style'
 import { getObjectBounds, getObjectCenter, textSize } from './geometry'
 
@@ -113,7 +115,10 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       const sw = o.strokeWidth ?? 2
       const lines = o.text.split('\n')
       const lineH = fontSize * 1.2
-      return (
+      const ld = textLeader(o)
+      const term = ld ? leaderTerminal(ld) : null
+      const lc = o.textColor || '#0f172a'
+      const body = (
         <g
           transform={transform}
           onPointerDown={down}
@@ -141,6 +146,21 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
               <tspan key={i} x={o.x + w / 2} dy={i === 0 ? 0 : lineH}>{l || ' '}</tspan>
             ))}
           </text>
+        </g>
+      )
+      if (!ld) return body
+      const d = `M ${ld.pts.map(p => `${p.x} ${p.y}`).join(' L ')}`
+      return (
+        <g>
+          {/* richiamo sotto al testo: il riquadro pieno copre l'attacco */}
+          <g onPointerDown={down}>
+            <path d={d} fill="none" stroke="transparent" strokeWidth={12} vectorEffect="non-scaling-stroke"
+              pointerEvents={interactive ? 'stroke' : 'none'} />
+            <path d={d} fill="none" stroke={lc} strokeWidth={ld.width} strokeLinejoin="round" pointerEvents="none" />
+            {term?.arrow && <path d={`M ${term.arrow.map(p => `${p.x} ${p.y}`).join(' L ')} Z`} fill={lc} pointerEvents="none" />}
+            {term?.dot && <circle cx={term.dot.c.x} cy={term.dot.c.y} r={term.dot.r} fill={lc} pointerEvents="none" />}
+          </g>
+          {body}
         </g>
       )
     }
@@ -178,6 +198,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       const d = Math.hypot(dx, dy)
       const label = o.text || `${Math.round(d * 10) / 10}`
       const tick = 6 + sw * 2
+      const term = quoteTerminals(o)
       return (
         <g transform={transform}>
           <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent"
@@ -186,6 +207,13 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           {[{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }].map((p, i) => (
             <line key={i} transform={`translate(${p.x}, ${p.y}) rotate(${angleDeg})`}
               x1={0} y1={-tick} x2={0} y2={tick} stroke={stroke} strokeWidth={sw} pointerEvents="none" />
+          ))}
+          {term.arrows.map((a, i) => (
+            <path key={`a${i}`} d={`M ${a.map(p => `${p.x} ${p.y}`).join(' L ')} Z`} fill={stroke} pointerEvents="none" />
+          ))}
+          {term.ticks.map(([a, b], i) => (
+            <line key={`t${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stroke} strokeWidth={sw * 1.8}
+              strokeLinecap="round" pointerEvents="none" />
           ))}
           <text
             transform={`translate(${(o.x1 + o.x2) / 2}, ${(o.y1 + o.y2) / 2}) rotate(${textAngle})`}

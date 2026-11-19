@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { CableObject, CanvasObject, DeckObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
+import { MaffeisLogo } from './components/MaffeisLogo'
 import { findProfile, profilesOfSeries, seriesByShape, useCatalog } from './profiles'
 import { BOLT_DIAMETERS, BOLT_GRADES, boltDims, boltLabel, boltLength } from './utils/boltUtils'
 import {
@@ -17,6 +18,7 @@ import {
 import {
   WELD_KINDS, WELD_PROCESSES, defaultBeadRot, filletLeg, filletThroat, isButt, weldLabel,
 } from './utils/weldUtils'
+import { defaultLeaderTip } from './utils/leaderUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
@@ -194,6 +196,10 @@ export function RightPanel({
         )}
 
         {tab === 'props' && selected && <ObjectProps o={selected} onChange={onChange} />}
+      </div>
+
+      <div className="rp-footer">
+        <MaffeisLogo height={20} />
       </div>
     </div>
   )
@@ -765,6 +771,23 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
               <option value="on">Con bordo</option>
             </select>
           </Field>
+          <label className="check-label">
+            <input type="checkbox" checked={!!o.leader}
+              onChange={e => onChange({ leader: e.target.checked ? defaultLeaderTip(o) : undefined })} />
+            Linea di richiamo
+          </label>
+          {o.leader && (
+            <Field label="Terminale">
+              <select value={o.leaderEnd ?? 'arrow'} onChange={e => onChange({ leaderEnd: e.target.value as 'arrow' | 'dot' | 'none' })}>
+                <option value="arrow">Freccia</option>
+                <option value="dot">Punto</option>
+                <option value="none">Nessuno</option>
+              </select>
+            </Field>
+          )}
+          {o.leader && (
+            <p className="muted full-width" style={{ margin: 0 }}>Trascina la maniglia sulla punta per spostarla.</p>
+          )}
         </div>
       )}
 
@@ -775,6 +798,14 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
               type="text" value={o.text || ''} placeholder={`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))} (automatico)`}
               onChange={e => onChange({ text: e.target.value })}
             />
+          </Field>
+          <Field label="Estremità" full>
+            <div className="segmented">
+              {([['arrow', 'Frecce'], ['tick', 'Trattino obliquo']] as const).map(([v, l]) => (
+                <button key={v} type="button" className={(o.ends ?? 'arrow') === v ? 'active' : ''}
+                  onClick={() => onChange({ ends: v })}>{l}</button>
+              ))}
+            </div>
           </Field>
         </div>
       )}

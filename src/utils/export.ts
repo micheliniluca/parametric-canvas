@@ -5,6 +5,8 @@ import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
 import { weldDrawing } from './weldUtils'
+import { leaderTerminal, textLeader } from './leaderUtils'
+import { quoteTerminals } from './quoteUtils'
 import { getObjectBounds, getObjectCenter, rotatePoint, textSize } from '../canvas/geometry'
 import { pathToPolylines } from './pathToPolylines'
 
@@ -171,6 +173,14 @@ function entitiesOf(o: CanvasObject): Ent[] {
       if (o.boxEnabled) {
         poly('TESTI', [{ x: o.x, y: o.y }, { x: o.x + w, y: o.y }, { x: o.x + w, y: o.y + h }, { x: o.x, y: o.y + h }], true)
       }
+      const ld = textLeader(o)
+      if (ld) {
+        // il richiamo è già in coordinate mondo (rotazione inclusa): niente R()
+        out.push({ kind: 'poly', layer: 'ANNOTAZIONI', color: tc, pts: ld.pts, closed: false })
+        const tm = leaderTerminal(ld)
+        if (tm.arrow) out.push({ kind: 'solid', layer: 'ANNOTAZIONI', color: tc, pts: [tm.arrow[0], tm.arrow[1], tm.arrow[2]] })
+        if (tm.dot) out.push({ kind: 'circle', layer: 'ANNOTAZIONI', color: tc, c: tm.dot.c, r: tm.dot.r })
+      }
       break
     }
 
@@ -202,6 +212,9 @@ function entitiesOf(o: CanvasObject): Ent[] {
         const b = rotatePoint({ x: p.x, y: p.y + tick }, p, angleDeg)
         poly('QUOTE', [a, b], false)
       }
+      const qt = quoteTerminals(o)
+      for (const a of qt.arrows) { poly('QUOTE', a, true); fill('QUOTE', a) }
+      for (const t of qt.ticks) poly('QUOTE', t, false)
       const mid = { x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }
       const tp = rotatePoint({ x: mid.x, y: mid.y - (4 + sw) }, mid, textAngle)
       text('QUOTE', tp, 14, o.text || `${Math.round(d * 10) / 10}`, textAngle, 'center', 'baseline', toAci(o.textColor || o.stroke))

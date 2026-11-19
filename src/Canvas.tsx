@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, SetStateAction } from 'react'
-import type { CanvasObject, Point } from './types'
+import type { CanvasObject, Point, QuoteObject } from './types'
 import type { ToolId } from './tools'
 import { TOOLS, isCreationTool } from './tools'
 import type { DrawStyle } from './style'
@@ -31,7 +31,7 @@ const dragThreshold = (pointerType: string) => (pointerType === 'pen' ? 6 : poin
 /** Due pressioni entro questo tempo (e vicine) valgono come doppio clic */
 const DOUBLE_TAP_MS = 400
 const round2 = (v: number) => Math.round(v * 100) / 100
-const ACCENT = '#6366f1'
+const ACCENT = '#2F6CB0'
 
 type Props = {
   objects: CanvasObject[]
@@ -67,6 +67,7 @@ type Interaction =
   | { kind: 'resize'; id: string; corner: Corner; start: CanvasObject }
   | { kind: 'vertex'; id: string; index: number }
   | { kind: 'end'; id: string; end: 'p1' | 'p2' }
+  | { kind: 'leader'; id: string }
   | { kind: 'rotate'; id: string; cx: number; cy: number; startAngle: number; initial: number }
   | { kind: 'freehand' }
   | { kind: 'segment' } // linea / freccia / bulloni: trascina dal primo al secondo punto
@@ -373,6 +374,7 @@ export function Canvas({
     if (g.kind === 'resize') action.current = { kind: 'resize', id, corner: g.corner, start: selected }
     else if (g.kind === 'vertex') action.current = { kind: 'vertex', id, index: g.index }
     else if (g.kind === 'end') action.current = { kind: 'end', id, end: g.end }
+    else if (g.kind === 'leader') action.current = { kind: 'leader', id }
     else {
       const c = getObjectCenter(selected)
       const w = toWorld(e)
@@ -528,6 +530,8 @@ export function Canvas({
         id: crypto.randomUUID(), type: 'quote', x: 0, y: 0,
         x1: s.p1.x, y1: s.p1.y, x2: s.p2.x, y2: s.p2.y,
         stroke: drawStyle.stroke, textColor: drawStyle.stroke, strokeWidth: 1,
+        // le estremità seguono l'ultima quota disegnata (di base le frecce)
+        ends: [...objects].reverse().find((q): q is QuoteObject => q.type === 'quote')?.ends ?? 'arrow',
       })
     } else if (tool === 'cable') {
       addObject(makeCable(s.p1, s.p2))
@@ -706,6 +710,10 @@ export function Canvas({
           }
           return o
         })
+        return
+
+      case 'leader':
+        updateObject(a.id, o => (o.type === 'text' ? { ...o, leader: pick(e, undefined, a.id) } : o))
         return
 
       case 'rotate': {

@@ -12,8 +12,9 @@ export type Grip =
   | { kind: 'vertex'; index: number }
   | { kind: 'end'; end: 'p1' | 'p2' }
   | { kind: 'rotate' }
+  | { kind: 'leader' }
 
-const ACCENT = '#6366f1'
+const ACCENT = '#2F6CB0'
 /** Oltre questo numero di vertici (es. mano libera) non si mostrano le maniglie dei vertici */
 const MAX_VERTEX_GRIPS = 40
 
@@ -130,6 +131,8 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
         )}
       </g>
 
+      {/* punta del richiamo: in coordinate mondo, fuori dalla rotazione del testo */}
+      {!locked && o.type === 'text' && o.leader && grip('leader', o.leader.x, o.leader.y, { kind: 'leader' }, 'move')}
       {canRotate && (
         <g>
           <line

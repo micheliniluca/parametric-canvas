@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 *,
 *::before,
@@ -7,18 +7,30 @@
 }
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  /* Color Palette - Slate & Indigo */
-  --bg-color: #f8fafc;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --accent: #8b5cf6;
-  --border-color: #e2e8f0;
+  /* Palette Maffeis (GLASSS UI style guide): Oxford Navy, Custom Blue, oro, neutri caldi */
+  --navy: #0A1628;
+  --bg-color: #F7F8FB;
+  --text-main: #0A1628;
+  --text-soft: #3B4A60;
+  --text-muted: #5B6B82;
+  --text-faint: #8A97AB;
+  --primary: #2F6CB0;
+  --primary-hover: #255A9A;
+  --primary-ink: #255A9A;
+  --primary-soft: rgba(47, 108, 176, 0.10);
+  --primary-line: rgba(47, 108, 176, 0.35);
+  --accent: #C9A227;
+  --border-color: rgba(10, 22, 40, 0.14);
+  --surface-alt: #EEF2F8;
+  --hover: #E4EAF3;
+  --danger: #B42318;
+  --danger-soft: #FDECEA;
+  --danger-line: #F5C2BC;
+  --warn: #B45309;
 
   /* Glassmorphism & Effects */
   --glass-bg: rgba(255, 255, 255, 0.7);
@@ -27,7 +39,7 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
-  --radius-md: 12px;
+  --radius-md: 8px;
   --radius-sm: 8px;
 
   color-scheme: light;
@@ -64,7 +76,7 @@ button {
 input,
 select {
   font-family: inherit;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   padding: 4px 8px;
   background: white;

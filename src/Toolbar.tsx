@@ -6,6 +6,7 @@ import {
   Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
   ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup,
 } from 'lucide-react'
+import { MaffeisLogo } from './components/MaffeisLogo'
 
 
 type Props = {
@@ -78,6 +79,7 @@ export function Toolbar(p: Props) {
   return (
     <header className="toolbar">
       <div className="tb-group">
+        <MaffeisLogo height={22} className="tb-logo" />
         <span className="tb-brand">Parametric Canvas</span>
         <Btn title="Nuovo disegno" onClick={p.onNew}><FilePlus2 size={18} /></Btn>
         <Btn title="Apri… (Ctrl+O)" onClick={p.onOpen}><FolderOpen size={18} /></Btn>

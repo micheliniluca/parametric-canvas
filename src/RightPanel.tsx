@@ -331,7 +331,14 @@ function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<C
       </div>
       <div className="prop-grid">
         <Field label="Profilo">
-          <select value={o.profile} onChange={e => onChange({ profile: e.target.value, thickness: deckProfile(e.target.value).thicknesses[0].t })}>
+          <select
+            value={o.profile}
+            onChange={e => {
+              const np = deckProfile(e.target.value)
+              // spessore e altezza dei pioli tornano ai valori del nuovo profilo
+              onChange({ profile: np.code, thickness: np.thicknesses[0].t, studH: np.studH })
+            }}
+          >
             {DECKS.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
           </select>
         </Field>
@@ -407,6 +414,11 @@ function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<C
                 {n.perBeam} per trave{o.view !== 'section' ? ` × ${n.beams} travi = ${n.total} pioli` : ''}.
                 Interasse 0 = solo le travi alle estremità (asse a 76 mm dal bordo).
               </p>
+              {!p.weldThroughStuds && (
+                <p className="full-width warn-text" style={{ margin: 0 }}>
+                  Il manuale non prevede pioli saldati attraverso la lamiera per {p.name}.
+                </p>
+              )}
               {s.h < minH && (
                 <p className="full-width warn-text" style={{ margin: 0 }}>
                   Il piolo deve sporgere almeno 2d sopra la greca: altezza minima {minH} mm.
@@ -427,12 +439,13 @@ function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<C
           <tr><th>Lamiere</th><td>{sh.full} intere{sh.cut ? ` + 1 tagliata a ${Math.round(sh.cut)} mm` : ''}</td></tr>
           <tr><th>Superficie</th><td>{nf((W * Lg) / 1e6)} m²</td></tr>
           <tr><th>Peso lamiera</th><td><b>{nf(deckSteelMass(o), 1)} kg</b> ({nf(t.weight * 1000 / 9.81, 1)} kg/m²)</td></tr>
-          <tr><th>Area / J</th><td>{t.area} mm²/m · {nf(t.I, 1)} cm⁴/m</td></tr>
+          <tr><th>Area</th><td>{t.area} mm²/m · asse neutro {nf(t.yna)} mm</td></tr>
+          <tr><th>J + / −</th><td>{nf(t.I)}{t.Ihog ? ` / ${nf(t.Ihog)}` : ''} cm⁴/m</td></tr>
           <tr><th>M ult. + / −</th><td>{nf(t.Msag)} / {nf(t.Mhog)} kNm/m</td></tr>
           {!!o.slab && (
             <>
               <tr><th>Calcestruzzo</th><td>{nf(vol.perM2, 3)} m³/m² · <b>{nf(vol.total)} m³</b></td></tr>
-              <tr><th>Peso getto (NW)</th><td>{nf(vol.perM2 * 23.54)} kN/m² fresco · {nf(vol.perM2 * 23.05)} kN/m² indurito</td></tr>
+              <tr><th>Peso getto (NW)</th><td>{nf(vol.perM2 * p.concrete.wet)} kN/m² fresco · {nf(vol.perM2 * p.concrete.dry)} kN/m² indurito</td></tr>
             </>
           )}
         </tbody>
@@ -440,7 +453,7 @@ function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<C
       {!!o.slab && o.slab < p.minSlab && (
         <p className="muted" style={{ margin: 0 }}>Il manuale parte da {p.minSlab} mm di soletta.</p>
       )}
-      <p className="muted" style={{ margin: 0 }}>Dati Tata Steel ComFlor (BS 5950), per metro di larghezza.</p>
+      <p className="muted" style={{ margin: 0 }}>Dati Tata Steel ComFlor ({p.standard}), per metro di larghezza.</p>
 
       <div className="prop-grid">
         <label className="check-label full-width">

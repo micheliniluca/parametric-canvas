@@ -2,8 +2,9 @@ import type { DeckObject, Point } from '../types'
 
 /**
  * Lamiere grecate collaboranti (catalogo Tata Steel ComFlor).
- * Profilo trapezoidale descritto da passo, cresta, gola e altezza; il disegno parte dal centro di una cresta,
- * dove cade anche il giunto di sovrapposizione tra due lamiere.
+ * Profilo trapezoidale descritto da passo, cresta, gola, altezza e nervature di irrigidimento.
+ * Il giunto di sovrapposizione tra due lamiere cade al centro di una cresta (ComFlor 46)
+ * o di una gola (ComFlor 60, 80, 100): il disegno di ogni lamiera parte da lì.
  */
 export type DeckThickness = {
   /** Spessore nominale (mm) */
@@ -16,44 +17,109 @@ export type DeckThickness = {
   weight: number
   /** Altezza dell'asse neutro (mm) */
   yna: number
-  /** Momento d'inerzia, momento ultimo positivo e negativo (per metro) */
+  /** Momento d'inerzia positivo e negativo (cm⁴/m); il negativo manca per alcuni profili */
   I: number
+  Ihog?: number
+  /** Momento ultimo positivo e negativo (kNm/m) */
   Msag: number
   Mhog: number
 }
+
+/** Nervatura: posizione dal centro della cresta o della gola, larghezza, altezza (positiva verso l'alto) */
+export type DeckRib = { at: number; w: number; h: number }
 
 export type DeckProfile = {
   code: string
   name: string
   maker: string
   steel: string
+  /** Norma delle tabelle del manuale */
+  standard: string
   /** Larghezza utile di una lamiera (mm) */
   cover: number
   /** Passo delle greche (mm) */
   pitch: number
-  /** Altezza (mm) */
+  /** Altezza, dal fondo della gola al piano delle creste (mm) */
   depth: number
   /** Larghezza della cresta (in alto) e della gola (in basso) (mm) */
   crown: number
   valley: number
-  /** Nervature di irrigidimento al centro di creste e gole: larghezza e profondità (mm) */
-  stiffener: { w: number; d: number }
+  crownRibs: DeckRib[]
+  valleyRibs: DeckRib[]
+  /** Dove cade il giunto di sovrapposizione tra due lamiere */
+  lapAt: 'crown' | 'valley'
   /** Volume dei vuoti delle greche sotto la soletta (m³/m²): volume getto = h − vuoti */
   voids: number
   /** Spessore minimo della soletta in tabella (mm) */
   minSlab: number
+  /** Peso del calcestruzzo normale usato nelle tabelle: fresco e indurito (kN/m³) */
+  concrete: { wet: number; dry: number }
+  /** Pioli saldati attraverso la lamiera previsti dal manuale, e loro altezza dopo la saldatura (mm) */
+  weldThroughStuds: boolean
+  studH: number
   thicknesses: DeckThickness[]
 }
 
+/** Calcestruzzo normale: valori BS (2400 / 2350 kg/m³) ed Eurocodice (25 / 24 kN/m³) */
+const BS_CONCRETE = { wet: 23.54, dry: 23.05 }
+const EC_CONCRETE = { wet: 25, dry: 24 }
+
 export const DECKS: DeckProfile[] = [
   {
-    code: 'CF46', name: 'ComFlor 46', maker: 'Tata Steel', steel: 'S280GD+Z275',
+    code: 'CF46', name: 'ComFlor 46', maker: 'Tata Steel', steel: 'S280GD+Z275', standard: 'BS 5950',
     cover: 900, pitch: 225, depth: 46, crown: 67, valley: 105,
-    stiffener: { w: 14, d: 4 },
-    voids: 0.019, minSlab: 96,
+    crownRibs: [{ at: 0, w: 14, h: -4 }],
+    valleyRibs: [{ at: 0, w: 14, h: 4 }],
+    lapAt: 'crown',
+    voids: 0.019, minSlab: 96, concrete: BS_CONCRETE,
+    weldThroughStuds: true, studH: 95,
     thicknesses: [
       { t: 0.9, design: 0.86, area: 1137, weight: 0.09, yna: 20.38, I: 41.5, Msag: 4.63, Mhog: 4.67 },
       { t: 1.2, design: 1.16, area: 1534, weight: 0.13, yna: 20.44, I: 53.0, Msag: 5.99, Mhog: 6.23 },
+    ],
+  },
+  {
+    code: 'CF60', name: 'ComFlor 60', maker: 'Tata Steel', steel: 'S350GD+Z275', standard: 'BS 5950 / Eurocodice',
+    cover: 600, pitch: 300, depth: 60, crown: 130, valley: 120,
+    // rilievo di 15 mm al centro della cresta, due bugne nella gola a 65 mm di interasse
+    crownRibs: [{ at: 0, w: 20, h: 15 }],
+    valleyRibs: [{ at: -32.5, w: 20, h: 6 }, { at: 32.5, w: 20, h: 6 }],
+    lapAt: 'valley',
+    voids: 0.032, minSlab: 110, concrete: EC_CONCRETE,
+    weldThroughStuds: true, studH: 95,
+    thicknesses: [
+      { t: 0.9, design: 0.86, area: 1276, weight: 0.10, yna: 33.70, I: 92.77, Ihog: 86.13, Msag: 9.30, Mhog: 7.50 },
+      { t: 1.0, design: 0.96, area: 1424, weight: 0.11, yna: 33.75, I: 106.15, Ihog: 97.95, Msag: 11.27, Mhog: 9.36 },
+      { t: 1.2, design: 1.16, area: 1721, weight: 0.14, yna: 33.85, I: 132.91, Ihog: 121.60, Msag: 15.21, Mhog: 13.07 },
+    ],
+  },
+  {
+    code: 'CF80', name: 'ComFlor 80', maker: 'Tata Steel', steel: 'S350GD+Z275', standard: 'BS 5950 / Eurocodice',
+    cover: 600, pitch: 300, depth: 80, crown: 150, valley: 120,
+    // rilievo di 15 mm al centro della cresta, due bugne nella gola a 70 mm di interasse
+    crownRibs: [{ at: 0, w: 20, h: 15 }],
+    valleyRibs: [{ at: -35, w: 20, h: 6 }, { at: 35, w: 20, h: 6 }],
+    lapAt: 'valley',
+    voids: 0.045, minSlab: 130, concrete: EC_CONCRETE,
+    weldThroughStuds: true, studH: 125,
+    thicknesses: [
+      { t: 0.9, design: 0.86, area: 1382, weight: 0.11, yna: 44.86, I: 165.42, Ihog: 156.17, Msag: 10.76, Mhog: 8.68 },
+      { t: 1.0, design: 0.96, area: 1542, weight: 0.12, yna: 44.90, I: 181.32, Ihog: 171.83, Msag: 13.34, Mhog: 10.65 },
+      { t: 1.2, design: 1.16, area: 1864, weight: 0.15, yna: 45.01, I: 213.13, Ihog: 203.16, Msag: 18.49, Mhog: 14.59 },
+    ],
+  },
+  {
+    code: 'CF100', name: 'ComFlor 100', maker: 'Tata Steel', steel: 'S280GD+Z275', standard: 'BS 5950',
+    cover: 700, pitch: 233.3, depth: 100, crown: 109, valley: 63,
+    // due incavi sulla cresta, una bugna al centro della gola
+    crownRibs: [{ at: -18, w: 12, h: -5 }, { at: 18, w: 12, h: -5 }],
+    valleyRibs: [{ at: 0, w: 12, h: 5 }],
+    lapAt: 'valley',
+    voids: 0.060, minSlab: 150, concrete: BS_CONCRETE,
+    weldThroughStuds: false, studH: 95,
+    thicknesses: [
+      { t: 0.9, design: 0.86, area: 1511, weight: 0.12, yna: 58.00, I: 225.77, Msag: 11.26, Mhog: 11.20 },
+      { t: 1.2, design: 1.16, area: 2022, weight: 0.16, yna: 58.00, I: 298.00, Msag: 12.40, Mhog: 18.64 },
     ],
   },
 ]
@@ -114,12 +180,15 @@ export const studSpec = (o: DeckObject) => {
   return { ...size, h: o.studH ?? 95, per: o.studsPerTrough === 2 ? 2 : 1 }
 }
 
-/** Posizioni (lungo la larghezza) del centro delle gole */
+/** Spostamento del profilo: 0 se la lamiera inizia al centro di una cresta, mezzo passo se inizia da una gola */
+const phaseOf = (p: DeckProfile) => (p.lapAt === 'valley' ? p.pitch / 2 : 0)
+
+/** Posizioni (lungo la larghezza) del centro delle gole, comprese quelle a cavallo dei bordi */
 export const troughCenters = (o: DeckObject) => {
   const p = deckProfile(o.profile)
   const W = deckWidth(o)
   const xs: number[] = []
-  for (let x = p.pitch / 2; x <= W - p.valley / 2 + 1e-6; x += p.pitch) xs.push(x)
+  for (let x = p.pitch / 2 - phaseOf(p); x <= W + 1e-6; x += p.pitch) if (x >= -1e-6) xs.push(x)
   return xs
 }
 
@@ -144,46 +213,61 @@ export const studCount = (o: DeckObject) => {
 
 /* ---------- geometria ---------- */
 
+/** Vertici di un tratto piano (cresta o gola) centrato in c, largo w, con le sue nervature */
+function flatWithRibs(c: number, w: number, y: number, ribs: DeckRib[]): Point[] {
+  const pts: Point[] = [{ x: c - w / 2, y }]
+  for (const r of [...ribs].sort((m, n) => m.at - n.at)) {
+    const x0 = c + r.at - r.w / 2
+    const x1 = c + r.at + r.w / 2
+    // fianchi inclinati: la nervatura è un piccolo trapezio
+    const t = Math.min(r.w / 4, Math.abs(r.h) * 0.6, 4)
+    pts.push({ x: x0, y }, { x: x0 + t, y: y + r.h }, { x: x1 - t, y: y + r.h }, { x: x1, y })
+  }
+  pts.push({ x: c + w / 2, y })
+  return pts
+}
+
 /** Punti di un tratto di profilo da x0 a x1 (coordinate locali: x lungo la linea, y in altezza) */
 function profilePoints(p: DeckProfile, x0: number, x1: number): Point[] {
-  const web = (p.pitch - p.crown - p.valley) / 2
-  const hc = p.crown / 2
-  const { w: sw, d: sd } = p.stiffener
-  const s = p.depth
-  // un passo, partendo dal centro della cresta (con la nervatura a cavallo dello zero)
-  const unit: Point[] = [
-    { x: 0, y: s - sd }, { x: sw / 2 - 2, y: s - sd }, { x: sw / 2, y: s },
-    { x: hc, y: s },
-    { x: hc + web, y: 0 },
-    { x: hc + web + p.valley / 2 - sw / 2, y: 0 }, { x: hc + web + p.valley / 2 - sw / 2 + 2, y: sd },
-    { x: hc + web + p.valley / 2 + sw / 2 - 2, y: sd }, { x: hc + web + p.valley / 2 + sw / 2, y: 0 },
-    { x: hc + web + p.valley, y: 0 },
-    { x: p.pitch - hc, y: s },
-    { x: p.pitch - sw / 2, y: s }, { x: p.pitch - sw / 2 + 2, y: s - sd },
-  ]
-  const pts: Point[] = []
-  const at = (x: number) => {
-    // altezza del profilo in x (interpolazione lineare sul passo)
-    const xm = ((x % p.pitch) + p.pitch) % p.pitch
-    const u = [...unit, { x: p.pitch, y: s - sd }]
-    for (let i = 1; i < u.length; i++) {
-      if (xm <= u[i].x) {
-        const a = u[i - 1], b = u[i]
-        return a.y + ((b.y - a.y) * (xm - a.x)) / (b.x - a.x || 1)
+  const ph = phaseOf(p)
+  // vertici di tutte le greche che toccano [x0, x1]: creste centrate in k·passo, gole a metà passo
+  const all: Point[] = []
+  const k0 = Math.floor((x0 + ph) / p.pitch) - 1
+  const k1 = Math.ceil((x1 + ph) / p.pitch) + 1
+  for (let k = k0; k <= k1; k++) {
+    const c = k * p.pitch - ph
+    all.push(...flatWithRibs(c, p.crown, p.depth, p.crownRibs))
+    all.push(...flatWithRibs(c + p.pitch / 2, p.valley, 0, p.valleyRibs))
+  }
+  // altezza in x per interpolazione (i vertici sono ordinati per x)
+  const yAt = (x: number) => {
+    for (let i = 1; i < all.length; i++) {
+      if (x <= all[i].x) {
+        const m = all[i - 1], n = all[i]
+        return m.y + ((n.y - m.y) * (x - m.x)) / (n.x - m.x || 1)
       }
     }
-    return s
+    return p.depth
   }
-  pts.push({ x: x0, y: at(x0) })
-  const first = Math.floor(x0 / p.pitch)
-  for (let k = first; k * p.pitch <= x1; k++) {
-    for (const q of unit) {
-      const x = k * p.pitch + q.x
-      if (x > x0 && x < x1) pts.push({ x, y: q.y })
+  return [
+    { x: x0, y: yAt(x0) },
+    ...all.filter(q => q.x > x0 + 1e-6 && q.x < x1 - 1e-6),
+    { x: x1, y: yAt(x1) },
+  ]
+}
+
+/** Spigoli (lungo la larghezza) di creste e gole, per la vista dall'alto */
+function ribEdges(p: DeckProfile, W: number) {
+  const ph = phaseOf(p)
+  const web = (p.pitch - p.crown - p.valley) / 2
+  const xs: number[] = []
+  for (let k = -1; k * p.pitch < W + p.pitch * 2; k++) {
+    const c = k * p.pitch - ph
+    for (const x of [c + p.crown / 2, c + p.crown / 2 + web, c + p.crown / 2 + web + p.valley, c + p.pitch - p.crown / 2]) {
+      if (x > 0.5 && x < W - 0.5) xs.push(x)
     }
   }
-  pts.push({ x: x1, y: at(x1) })
-  return pts
+  return xs
 }
 
 type Frame = { o: Point; u: Point; v: Point }
@@ -228,12 +312,17 @@ export function deckDrawing(o: DeckObject) {
   if (o.view === 'section') {
     const pts = profilePoints(p, 0, W)
     deck = poly(pts.map(q => P(q.x, q.y)))
-    // giunti di sovrapposizione: risvolto di 10 mm della lamiera successiva
+    // giunti di sovrapposizione: risvolto della lamiera successiva sulla cresta, o gancio nella gola
     for (let x = cover; x < W - 1; x += cover) {
-      const y = p.depth - p.stiffener.d
-      thin += poly([P(x - 4, y + 8.7), P(x + 1, y)])
+      if (p.lapAt === 'crown') {
+        const y = p.depth + Math.min(0, p.crownRibs[0]?.h ?? 0)
+        thin += poly([P(x - 4, y + 8.7), P(x + 1, y)])
+      } else {
+        thin += poly([P(x, 0), P(x, 11), P(x + 5, 11)])
+      }
     }
-    const top = Math.max(o.slab || 0, p.depth)
+    const ribTop = p.depth + Math.max(0, ...p.crownRibs.map(r => r.h))
+    const top = Math.max(o.slab || 0, ribTop)
     if (o.slab) {
       const ring = [...pts, { x: W, y: top }, { x: 0, y: top }].map(q => P(q.x, q.y))
       slab = poly(ring, true)
@@ -248,15 +337,9 @@ export function deckDrawing(o: DeckObject) {
     // vista dall'alto: la linea è la larghezza, la lunghezza va in perpendicolare
     const Lg = o.length
     const rect = [P(0, 0), P(W, 0), P(W, Lg), P(0, Lg)]
-    const web = (p.pitch - p.crown - p.valley) / 2
+    // spigoli di creste e gole
     let ribs = ''
-    for (let k = 0; k * p.pitch < W + p.pitch; k++) {
-      const base = k * p.pitch
-      // bordi delle creste (spigoli in alto) e delle gole (spigoli in basso)
-      for (const x of [base + p.crown / 2, base + p.crown / 2 + web, base + p.crown / 2 + web + p.valley, base + p.pitch - p.crown / 2]) {
-        if (x > 0.5 && x < W - 0.5) ribs += poly([P(x, 0), P(x, Lg)])
-      }
-    }
+    for (const x of ribEdges(p, W)) ribs += poly([P(x, 0), P(x, Lg)])
     let joints = ''
     for (let x = cover; x < W - 1; x += cover) joints += poly([P(x, 0), P(x, Lg)])
     if (o.studs) {

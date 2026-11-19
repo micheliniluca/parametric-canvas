@@ -17,7 +17,7 @@ import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
 import { TextEditor } from './canvas/TextEditor'
 import { findProfile } from './profiles'
 import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
-import { DEFAULT_DECK } from './utils/deckUtils'
+import { DEFAULT_DECK, deckProfile } from './utils/deckUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -230,7 +230,7 @@ export function Canvas({
       id: crypto.randomUUID(), type: 'deck', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
       profile: prev?.profile ?? DEFAULT_DECK, thickness: prev?.thickness ?? 0.9, view: 'section',
       width: 2700, length: prev?.length ?? 3000, slab: prev?.slab ?? 0, hatch: prev?.hatch ?? true, showLabel: true,
-      studs: prev?.studs ?? false, studD: prev?.studD ?? 19, studH: prev?.studH ?? 95,
+      studs: prev?.studs ?? false, studD: prev?.studD ?? 19, studH: prev?.studH ?? deckProfile(prev?.profile ?? DEFAULT_DECK).studH,
       studsPerTrough: prev?.studsPerTrough ?? 1, beamSpacing: prev?.beamSpacing ?? 0,
       stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#e2e8f0',
     }

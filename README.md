@@ -35,7 +35,7 @@ npm run dev
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |
 | B | Bullone: clic per inserirlo; diametro, classe, vista (testa, dado, foro, sezione) e ripetizione nel pannello |
-| H | Lamiera grecata (ComFlor 46): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
+| H | Lamiera grecata (ComFlor 46, 60, 80, 100): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | Q / M | Quota / Misura |
 | S / O / G | Attiva SNAP / ORTO / GRIGLIA |

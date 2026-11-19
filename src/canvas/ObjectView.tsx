@@ -4,6 +4,7 @@ import { findProfile } from '../profiles'
 import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUtils'
 import { cableDrawing, cableLabel } from '../utils/cableUtils'
+import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
 import { dashArray } from '../style'
 import { getObjectBounds, getObjectCenter, textSize } from './geometry'
 
@@ -249,6 +250,57 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
             <text transform={`translate(${mid.x}, ${mid.y}) rotate(${textAngle})`} fontSize={fs} fill={stroke}
               textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>
               {cableLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'deck': {
+      const sw = o.strokeWidth ?? 1.5
+      const dr = deckDrawing(o)
+      const fill = o.fillEnabled ? o.fillColor || '#e2e8f0' : 'none'
+      const lp = o.showLabel !== false ? deckLabelPlacement(o) : null
+      return (
+        <g transform={transform} onPointerDown={down}>
+          {/* area di presa lungo la linea d'appoggio */}
+          <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent" strokeWidth={14}
+            vectorEffect="non-scaling-stroke" pointerEvents={interactive ? 'stroke' : 'none'} />
+          {dr.slab && (
+            <path d={dr.slab} fill={fill} fillOpacity={fo} stroke={stroke} strokeWidth={sw * 0.75}
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
+          )}
+          {dr.slab && o.hatch && (
+            <>
+              <defs>
+                <pattern id={`conc-${o.id}`} width={CONCRETE_TILE} height={CONCRETE_TILE} patternUnits="userSpaceOnUse">
+                  <path d={concreteHatch.triangles} fill="none" stroke={stroke} strokeWidth={0.7} strokeLinejoin="round" />
+                  <path d={concreteHatch.dots} fill={stroke} />
+                </pattern>
+              </defs>
+              <path d={dr.slab} fill={`url(#conc-${o.id})`} stroke="none" pointerEvents="none" />
+            </>
+          )}
+          {dr.deck && (
+            <path d={dr.deck} fill={o.view === 'section' || dr.slab ? 'none' : fill} fillOpacity={fo}
+              stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+              pointerEvents={o.view === 'section' ? (interactive ? 'stroke' : 'none') : pe} />
+          )}
+          {dr.hidden && (
+            <path d={dr.hidden} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.5}
+              strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+          )}
+          {dr.thin && (
+            <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+          )}
+          {dr.studs && (
+            <path d={dr.studs} fill="white" stroke={stroke} strokeWidth={sw * 0.75} vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round" pointerEvents="none" />
+          )}
+          {lp && (
+            <text transform={`translate(${lp.pos.x}, ${lp.pos.y}) rotate(${lp.angle})`} fontSize={lp.fontSize} fill={stroke}
+              textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>
+              {deckLabel(o)}
             </text>
           )}
         </g>

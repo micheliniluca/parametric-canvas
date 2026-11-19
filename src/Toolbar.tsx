@@ -103,6 +103,7 @@ export function Toolbar(p: Props) {
         {toolBtn('profile')}
         {toolBtn('bolt')}
         {toolBtn('cable')}
+        {toolBtn('deck')}
         {toolBtn('quote')}
         {toolBtn('bubble')}
         {toolBtn('measure')}

@@ -3,6 +3,7 @@ import { findProfile } from '../profiles'
 import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
+import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
 import { getObjectBounds, getObjectCenter, rotatePoint, textSize } from '../canvas/geometry'
 import { pathToPolylines } from './pathToPolylines'
 
@@ -13,7 +14,7 @@ import { pathToPolylines } from './pathToPolylines'
  * Le immagini e i riempimenti non vengono esportati.
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'NASCOSTE' | 'ASSI'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'NASCOSTE' | 'ASSI'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -23,6 +24,9 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'PROFILI', color: 4, ltype: 'CONTINUOUS' },
   { name: 'BULLONI', color: 2, ltype: 'CONTINUOUS' },
   { name: 'CAVI', color: 6, ltype: 'CONTINUOUS' },
+  { name: 'LAMIERE', color: 5, ltype: 'CONTINUOUS' },
+  { name: 'CALCESTRUZZO', color: 8, ltype: 'CONTINUOUS' },
+  { name: 'PIOLI', color: 2, ltype: 'CONTINUOUS' },
   { name: 'NASCOSTE', color: 8, ltype: 'DASHED' },
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
 ]
@@ -215,6 +219,20 @@ function entitiesOf(o: CanvasObject): Ent[] {
         const off = (o.size / 2 + fs * 0.4) * (textAngle === dr.angle ? -1 : 1)
         const mid = { x: (o.x1 + o.x2) / 2 + dr.v.x * off, y: (o.y1 + o.y2) / 2 + dr.v.y * off }
         text('CAVI', mid, fs, cableLabel(o), textAngle, 'center', 'middle')
+      }
+      break
+    }
+
+    case 'deck': {
+      const dr = deckDrawing(o)
+      path('CALCESTRUZZO', dr.slab)
+      path('LAMIERE', dr.deck)
+      path('LAMIERE', dr.thin)
+      path('NASCOSTE', dr.hidden)
+      path('PIOLI', dr.studs)
+      if (o.showLabel !== false) {
+        const lp = deckLabelPlacement(o)
+        text('LAMIERE', lp.pos, lp.fontSize, deckLabel(o), lp.angle, 'center', 'middle')
       }
       break
     }

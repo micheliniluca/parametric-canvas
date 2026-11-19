@@ -17,6 +17,7 @@ import { WandPanel, MeasurePanel, ScalePanel } from './canvas/Overlays'
 import { TextEditor } from './canvas/TextEditor'
 import { findProfile } from './profiles'
 import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
+import { DEFAULT_DECK } from './utils/deckUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -218,6 +219,20 @@ export function Canvas({
       endSocket: last?.type === 'cable' ? last.endSocket : true,
       showLabel: true,
       stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#cbd5e1',
+    }
+  }
+
+  // una nuova lamiera riprende profilo, spessore, lunghezza e getto dell'ultima disegnata
+  const makeDeck = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'deck')
+    const prev = last?.type === 'deck' ? last : null
+    return {
+      id: crypto.randomUUID(), type: 'deck', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      profile: prev?.profile ?? DEFAULT_DECK, thickness: prev?.thickness ?? 0.9, view: 'section',
+      width: 2700, length: prev?.length ?? 3000, slab: prev?.slab ?? 0, hatch: prev?.hatch ?? true, showLabel: true,
+      studs: prev?.studs ?? false, studD: prev?.studD ?? 19, studH: prev?.studH ?? 95,
+      studsPerTrough: prev?.studsPerTrough ?? 1, beamSpacing: prev?.beamSpacing ?? 0,
+      stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#e2e8f0',
     }
   }
 
@@ -425,6 +440,7 @@ export function Canvas({
         return
       case 'quote':
       case 'cable':
+      case 'deck':
       case 'measure':
       case 'scale': {
         const p = pick(e, segment?.p1)
@@ -496,6 +512,8 @@ export function Canvas({
       })
     } else if (tool === 'cable') {
       addObject(makeCable(s.p1, s.p2))
+    } else if (tool === 'deck') {
+      addObject(makeDeck(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -555,7 +573,7 @@ export function Canvas({
 
     // Anteprime degli strumenti a clic
     if (!a) {
-      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'measure' || tool === 'scale')) {
+      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -660,7 +678,7 @@ export function Canvas({
 
       case 'end':
         updateObject(a.id, o => {
-          if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable') {
+          if (o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck') {
             const other = a.end === 'p1' ? { x: o.x2, y: o.y2 } : { x: o.x1, y: o.y1 }
             const p = pick(e, other, a.id)
             return a.end === 'p1' ? { ...o, x1: p.x, y1: p.y } : { ...o, x2: p.x, y2: p.y }
@@ -909,6 +927,11 @@ export function Canvas({
             {segment && tool === 'cable' && dist(segment.p1, segment.p2) > 0 && (
               <g opacity={0.55} pointerEvents="none">
                 <ObjectView o={makeCable(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
+            {segment && tool === 'deck' && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={makeDeck(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
               </g>
             )}
             {segment && tool !== 'line' && tool !== 'rect' && tool !== 'circle' && (

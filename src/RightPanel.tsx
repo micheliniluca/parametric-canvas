@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject } from './types'
+import type { CableObject, CanvasObject, DeckObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { findProfile, profilesOfSeries, seriesByShape, useCatalog } from './profiles'
@@ -10,6 +10,10 @@ import {
   FLC_SIZES, cableLabel, cableMass, cableNRd, cableSpan, flcRope, ropeLength, socketCount, ttfSocket,
 } from './utils/cableUtils'
 import { exportToDXF } from './utils/export'
+import {
+  DECKS, STUD_SIZES, deckLabel, deckLength, deckProfile, deckSheets, deckSpan, deckSteelMass, deckThickness, deckWidth,
+  slabVolume, studCount, studSpec,
+} from './utils/deckUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
@@ -49,7 +53,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
-  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC',
+  symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -293,6 +297,161 @@ function CableProps({ o, onChange }: { o: CableObject; onChange: (patch: Partial
   )
 }
 
+/** Lamiera grecata: profilo, spessore, vista, larghezza/lunghezza, getto */
+function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const p = deckProfile(o.profile)
+  const t = deckThickness(o)
+  const W = deckWidth(o)
+  const Lg = deckLength(o)
+  const sh = deckSheets(o)
+  const vol = slabVolume(o)
+  const span = deckSpan(o)
+  const u = span > 0 ? { x: (o.x2 - o.x1) / span, y: (o.y2 - o.y1) / span } : { x: 1, y: 0 }
+  /** porta la linea alla misura data, spostando il punto finale lungo la sua direzione */
+  const lineTo = (len: number) => ({ x2: o.x1 + u.x * len, y2: o.y1 + u.y * len })
+  const setWidth = (v: number) => onChange(o.view === 'side' ? { width: v } : lineTo(v))
+  const setLength = (v: number) => onChange(o.view === 'side' ? lineTo(v) : { length: v })
+  // cambiando vista la linea passa da larghezza a lunghezza (e viceversa): le misure restano quelle
+  const setView = (view: DeckObject['view']) => {
+    if (view === o.view) return
+    const lineIsWidth = (vw: DeckObject['view']) => vw !== 'side'
+    if (lineIsWidth(view) === lineIsWidth(o.view)) return onChange({ view })
+    onChange(view === 'side'
+      ? { view, width: W, ...lineTo(Lg) }
+      : { view, length: Lg, ...lineTo(W) })
+  }
+  const nf = (v: number, d = 2) => v.toFixed(d).replace('.', ',')
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{deckLabel(o)}</div>
+        <div className="muted">
+          {p.maker} · {p.steel} · H {p.depth} · passo {p.pitch} · larghezza utile {p.cover} mm
+        </div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Profilo">
+          <select value={o.profile} onChange={e => onChange({ profile: e.target.value, thickness: deckProfile(e.target.value).thicknesses[0].t })}>
+            {DECKS.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Spessore">
+          <select value={t.t} onChange={e => onChange({ thickness: Number(e.target.value) })}>
+            {p.thicknesses.map(x => <option key={x.t} value={x.t}>{nf(x.t)} mm</option>)}
+          </select>
+        </Field>
+        <Field label="Vista" full>
+          <div className="segmented">
+            {([['section', 'Sezione'], ['top', "Dall'alto"], ['side', 'Laterale']] as const).map(([v, l]) => (
+              <button key={v} type="button" className={o.view === v ? 'active' : ''} onClick={() => setView(v)}>{l}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label={`Larghezza (mm)${o.view !== 'side' ? ' · linea' : ''}`}>
+          <Num value={W} min={1} onChange={setWidth} />
+        </Field>
+        <Field label={`Lunghezza (mm)${o.view === 'side' ? ' · linea' : ''}`}>
+          <Num value={Lg} min={1} onChange={setLength} />
+        </Field>
+      </div>
+
+      <h4>Getto</h4>
+      <div className="prop-grid">
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.slab} onChange={e => onChange({ slab: e.target.checked ? Math.max(120, p.minSlab) : 0, hatch: o.hatch ?? true })} />
+          Soletta
+        </label>
+        {!!o.slab && (
+          <Field label="Spessore totale (mm)">
+            <Num value={o.slab} min={p.depth + 1} onChange={v => onChange({ slab: v })} />
+          </Field>
+        )}
+        {!!o.slab && (
+          <label className="check-label full-width">
+            <input type="checkbox" checked={!!o.hatch} onChange={e => onChange({ hatch: e.target.checked })} />
+            Retino calcestruzzo
+          </label>
+        )}
+      </div>
+
+      <h4>Pioli</h4>
+      <div className="prop-grid">
+        <label className="check-label full-width">
+          <input type="checkbox" checked={!!o.studs} onChange={e => onChange({ studs: e.target.checked })} />
+          Mostra i pioli (al centro delle gole, sulle travi)
+        </label>
+        {o.studs && (() => {
+          const s = studSpec(o)
+          const n = studCount(o)
+          const minH = p.depth + 2 * s.d
+          return (
+            <>
+              <Field label="Diametro">
+                <select value={s.d} onChange={e => onChange({ studD: Number(e.target.value) })}>
+                  {STUD_SIZES.map(x => <option key={x.d} value={x.d}>Ø{x.d}</option>)}
+                </select>
+              </Field>
+              <Field label="Altezza saldato (mm)">
+                <Num value={s.h} min={p.depth + 1} onChange={v => onChange({ studH: v })} />
+              </Field>
+              <Field label="Per gola">
+                <select value={s.per} onChange={e => onChange({ studsPerTrough: Number(e.target.value) })}>
+                  <option value={1}>1</option>
+                  <option value={2}>2 (a 4d = {4 * s.d} mm)</option>
+                </select>
+              </Field>
+              <Field label="Interasse travi (mm)">
+                <Num value={o.beamSpacing ?? 0} min={0} onChange={v => onChange({ beamSpacing: v })} />
+              </Field>
+              <p className="muted full-width" style={{ margin: 0 }}>
+                {n.perBeam} per trave{o.view !== 'section' ? ` × ${n.beams} travi = ${n.total} pioli` : ''}.
+                Interasse 0 = solo le travi alle estremità (asse a 76 mm dal bordo).
+              </p>
+              {s.h < minH && (
+                <p className="full-width warn-text" style={{ margin: 0 }}>
+                  Il piolo deve sporgere almeno 2d sopra la greca: altezza minima {minH} mm.
+                </p>
+              )}
+              {!!o.slab && s.h > o.slab - 15 && (
+                <p className="full-width warn-text" style={{ margin: 0 }}>
+                  Il piolo arriva a meno di 15 mm dall'estradosso della soletta ({o.slab} mm).
+                </p>
+              )}
+            </>
+          )
+        })()}
+      </div>
+
+      <table className="data-table">
+        <tbody>
+          <tr><th>Lamiere</th><td>{sh.full} intere{sh.cut ? ` + 1 tagliata a ${Math.round(sh.cut)} mm` : ''}</td></tr>
+          <tr><th>Superficie</th><td>{nf((W * Lg) / 1e6)} m²</td></tr>
+          <tr><th>Peso lamiera</th><td><b>{nf(deckSteelMass(o), 1)} kg</b> ({nf(t.weight * 1000 / 9.81, 1)} kg/m²)</td></tr>
+          <tr><th>Area / J</th><td>{t.area} mm²/m · {nf(t.I, 1)} cm⁴/m</td></tr>
+          <tr><th>M ult. + / −</th><td>{nf(t.Msag)} / {nf(t.Mhog)} kNm/m</td></tr>
+          {!!o.slab && (
+            <>
+              <tr><th>Calcestruzzo</th><td>{nf(vol.perM2, 3)} m³/m² · <b>{nf(vol.total)} m³</b></td></tr>
+              <tr><th>Peso getto (NW)</th><td>{nf(vol.perM2 * 23.54)} kN/m² fresco · {nf(vol.perM2 * 23.05)} kN/m² indurito</td></tr>
+            </>
+          )}
+        </tbody>
+      </table>
+      {!!o.slab && o.slab < p.minSlab && (
+        <p className="muted" style={{ margin: 0 }}>Il manuale parte da {p.minSlab} mm di soletta.</p>
+      )}
+      <p className="muted" style={{ margin: 0 }}>Dati Tata Steel ComFlor (BS 5950), per metro di larghezza.</p>
+
+      <div className="prop-grid">
+        <label className="check-label full-width">
+          <input type="checkbox" checked={o.showLabel !== false} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
 /**
  * Trasparenza del riempimento e dell'intero oggetto (0 % = opaco).
  * Con più oggetti e valori diversi lo indica come "misto"; spostando il cursore li uniforma.
@@ -349,6 +508,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
   let weighed = 0
   for (const o of objs) {
     if (o.type === 'cable') { weight += cableMass(o); weighed++; continue }
+    if (o.type === 'deck') { weight += deckSteelMass(o); weighed++; continue }
     if (o.type !== 'profile' || o.viewType === 'front') continue
     const g = findProfile(o.profileName)?.g
     if (g) { weight += (g * o.length) / 1000; weighed++ }
@@ -371,7 +531,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
         {[...counts].map(([label, n]) => <span key={label}>{n} × {label}</span>)}
       </div>
       {weighed > 0 && (
-        <p className="muted" style={{ margin: 0 }}>Peso (profili in vista laterale/dall'alto, cavi): <b>{round1(weight)} kg</b></p>
+        <p className="muted" style={{ margin: 0 }}>Peso acciaio (profili in vista laterale/dall'alto, cavi, lamiere): <b>{round1(weight)} kg</b></p>
       )}
       {locked > 0 && <p className="muted" style={{ margin: 0 }}>{locked} bloccati: non si spostano.</p>}
 
@@ -410,7 +570,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
 
 function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   useCatalog()
-  const isEndpoint = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable'
+  const isEndpoint = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck'
   const hasXY = o.type !== 'polyline' && !isEndpoint
   const canRotate = !isEndpoint
 
@@ -568,6 +728,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       )}
 
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
+      {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
 
       {o.type === 'image' && o.clipPoints && (
         <div className="prop-grid">
@@ -609,7 +770,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {canRotate && (
           <Field label="Rotazione (°)"><Num value={o.rotation || 0} onChange={v => onChange({ rotation: v })} /></Field>
         )}
-        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable') && (
+        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable' || o.type === 'deck') && (
           <Field label="Spessore linea"><Num value={o.strokeWidth ?? 2} min={0.25} step={0.5} onChange={v => onChange({ strokeWidth: v })} /></Field>
         )}
       </div>

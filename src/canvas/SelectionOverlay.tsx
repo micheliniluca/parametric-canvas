@@ -44,7 +44,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   )
 
   const locked = !!o.locked
-  const isEndpointType = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable'
+  const isEndpointType = o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck'
   const showVertices = !locked && o.type === 'polyline' && o.points.length <= MAX_VERTEX_GRIPS
   const showBox = locked || (!isEndpointType && !showVertices)
   const b = getObjectBounds(o)
@@ -59,6 +59,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   if (o.type === 'rect' || o.type === 'image') parts.push(`${round1(o.width)} × ${round1(o.height)}`)
   else if (o.type === 'circle') parts.push(`Ø ${round1(o.radius * 2)}`)
   else if (o.type === 'bolt') parts.push(`M${o.diameter}${o.cols * (o.view === 'section' ? 1 : o.rows) > 1 ? ` · ${o.cols}×${o.view === 'section' ? 1 : o.rows}` : ''}`)
+  else if (o.type === 'deck') parts.push(`${o.view === 'side' ? 'L' : 'B'} ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)

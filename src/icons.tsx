@@ -33,6 +33,14 @@ export const IconCable = ({ size }: Props) => (
   </Svg>
 )
 
+/** Lamiera grecata in sezione */
+export const IconDeck = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 1.5 9 H 4 L 6.5 16 H 10 L 12.5 9 H 15 L 17.5 16 H 21 L 22.5 12" strokeWidth={1.75} />
+    <path d="M 1.5 19.5 H 22.5" strokeWidth={1.25} strokeDasharray="3 2" />
+  </Svg>
+)
+
 /** Sezione di una trave IPE con raccordi */
 export const IconIPE = ({ size }: Props) => (
   <Svg size={size}>

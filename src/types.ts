@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck'
   x: number
   y: number
   stroke?: string
@@ -142,6 +142,43 @@ export type CableObject = BaseObject & {
   showLabel?: boolean
 }
 
+/**
+ * Lamiera grecata (es. ComFlor 46) disegnata con una linea.
+ * Sezione e vista dall'alto: la linea è la larghezza, sul piano d'appoggio (fondo delle gole).
+ * Vista laterale (lungo le greche): la linea è la lunghezza della lamiera.
+ */
+export type DeckObject = BaseObject & {
+  type: 'deck'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  /** Codice del profilo nel catalogo lamiere (es. CF46) */
+  profile: string
+  /** Spessore nominale (mm) */
+  thickness: number
+  view: 'section' | 'top' | 'side'
+  /** Larghezza (mm), usata quando la linea è la lunghezza (vista laterale) */
+  width: number
+  /** Lunghezza della lamiera / campata (mm), usata quando la linea è la larghezza */
+  length: number
+  /** Spessore totale della soletta dal fondo delle gole (mm); 0 o assente = senza getto */
+  slab?: number
+  /** Retino del calcestruzzo (tipo AR-CONC) sul getto */
+  hatch?: boolean
+  /** Pioli saldati attraverso la lamiera (connettori a taglio) */
+  studs?: boolean
+  /** Diametro del gambo (mm) */
+  studD?: number
+  /** Altezza dopo la saldatura (mm) */
+  studH?: number
+  /** Pioli per gola (1 o 2) */
+  studsPerTrough?: number
+  /** Interasse delle travi intermedie (mm); 0 o assente = solo le travi d'estremità */
+  beamSpacing?: number
+  showLabel?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -153,4 +190,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject

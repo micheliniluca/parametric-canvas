@@ -7,7 +7,7 @@ import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
 import { quoteTerminals } from './quoteUtils'
-import { getObjectBounds, getObjectCenter, rotatePoint, textSize } from '../canvas/geometry'
+import { getObjectBounds, getObjectCenter, profileToWorld, rotatePoint, textSize } from '../canvas/geometry'
 import { pathToPolylines } from './pathToPolylines'
 
 /**
@@ -244,7 +244,7 @@ function entitiesOf(o: CanvasObject): Ent[] {
       const profile = findProfile(o.profileName)
       if (!profile) break
       const { path: d, dashed } = generateBeamPath({ ...profile, viewType: o.viewType, length: o.length })
-      const local = (p: Point) => ({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale })
+      const local = profileToWorld(o)
       path('PROFILI', d, local)
       path('NASCOSTE', dashed, local)
       const label = o.label === 'name' ? profile.name : o.label === 'code' ? profile.code : o.label === 'tekla' ? profile.tekla : ''

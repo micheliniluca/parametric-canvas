@@ -4,7 +4,7 @@ import type { ToolId } from './tools'
 import { TOOLS } from './tools'
 import {
   Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
-  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup,
+  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup, FlipHorizontal2,
 } from 'lucide-react'
 import { MaffeisLogo } from './components/MaffeisLogo'
 
@@ -27,6 +27,7 @@ type Props = {
   onDelete: () => void
   onPaste: () => void
   onToggleLock: () => void
+  onMirror: () => void
   /** Numero di oggetti selezionati */
   selectionCount: number
   allLocked: boolean
@@ -129,6 +130,7 @@ export function Toolbar(p: Props) {
           {p.allLocked ? <Lock size={18} /> : <LockOpen size={18} />}
         </Btn>
         <Btn title="Duplica (Ctrl+D)" onClick={p.onDuplicate} disabled={!has}><Copy size={18} /></Btn>
+        <Btn title="Specchia: sinistra ↔ destra (con la rotazione di 180° si ottiene alto ↔ basso)" onClick={p.onMirror} disabled={!has || p.allLocked}><FlipHorizontal2 size={18} /></Btn>
         <Btn title="Porta in primo piano (Ctrl+])" onClick={p.onBringToFront} disabled={!has}><ChevronsUp size={18} /></Btn>
         <Btn title="Manda in fondo (Ctrl+[)" onClick={p.onSendToBack} disabled={!has}><ChevronsDown size={18} /></Btn>
         <Btn title="Elimina (Canc)" onClick={p.onDelete} disabled={!has || p.allLocked}><Trash2 size={18} /></Btn>

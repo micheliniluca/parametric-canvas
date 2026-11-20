@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Dispatch, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, SetStateAction } from 'react'
 import type { CanvasObject, Point, QuoteObject } from './types'
+import { textLeader } from './utils/leaderUtils'
 import type { ToolId } from './tools'
 import { TOOLS, isCreationTool } from './tools'
 import type { DrawStyle } from './style'
@@ -68,6 +69,7 @@ type Interaction =
   | { kind: 'vertex'; id: string; index: number }
   | { kind: 'end'; id: string; end: 'p1' | 'p2' }
   | { kind: 'leader'; id: string }
+  | { kind: 'leaderText'; id: string; attach: Point; ox: number; oy: number }
   | { kind: 'rotate'; id: string; cx: number; cy: number; startAngle: number; initial: number }
   | { kind: 'freehand' }
   | { kind: 'segment' } // linea / freccia / bulloni: trascina dal primo al secondo punto
@@ -231,7 +233,7 @@ export function Canvas({
     return {
       id: crypto.randomUUID(), type: 'deck', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
       profile: prev?.profile ?? DEFAULT_DECK, thickness: prev?.thickness ?? 0.9, view: 'section',
-      width: 2700, length: prev?.length ?? 3000, slab: prev?.slab ?? 0, hatch: prev?.hatch ?? true, showLabel: true,
+      width: 2700, length: prev?.length ?? 3000, slab: prev?.slab ?? 0, hatch: prev?.hatch ?? true, showLabel: false,
       studs: prev?.studs ?? false, studD: prev?.studD ?? 19, studH: prev?.studH ?? deckProfile(prev?.profile ?? DEFAULT_DECK).studH,
       studsPerTrough: prev?.studsPerTrough ?? 1, beamSpacing: prev?.beamSpacing ?? 0,
       stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#e2e8f0',
@@ -375,6 +377,10 @@ export function Canvas({
     else if (g.kind === 'vertex') action.current = { kind: 'vertex', id, index: g.index }
     else if (g.kind === 'end') action.current = { kind: 'end', id, end: g.end }
     else if (g.kind === 'leader') action.current = { kind: 'leader', id }
+    else if (g.kind === 'leaderText' && selected.type === 'text') {
+      const ld = textLeader(selected)
+      if (ld) action.current = { kind: 'leaderText', id, attach: ld.pts[1], ox: selected.x, oy: selected.y }
+    }
     else {
       const c = getObjectCenter(selected)
       const w = toWorld(e)
@@ -443,9 +449,20 @@ export function Canvas({
         })
         return
       }
+      case 'rect': {
+        // due clic sui vertici opposti della diagonale (trascinando funziona ancora)
+        if (segment) {
+          addRect(segment.p1, rectCorner(e, segment.p1))
+          setSegment(null)
+          return
+        }
+        const p = pick(e)
+        setSegment({ p1: p, p2: p })
+        action.current = { kind: 'segment' }
+        return
+      }
       case 'line':
       case 'arrow':
-      case 'rect':
       case 'circle': {
         const p = pick(e)
         setSegment({ p1: p, p2: p })
@@ -523,6 +540,23 @@ export function Canvas({
     }
   }
 
+  /** Secondo vertice del rettangolo: con Shift diventa un quadrato */
+  const rectCorner = (e: ReactMouseEvent, p1: Point): Point => {
+    const p = pick(e)
+    if (!e.shiftKey) return p
+    const d = Math.max(Math.abs(p.x - p1.x), Math.abs(p.y - p1.y))
+    return { x: p1.x + Math.sign(p.x - p1.x || 1) * d, y: p1.y + Math.sign(p.y - p1.y || 1) * d }
+  }
+
+  const addRect = (p1: Point, p2: Point) => {
+    const width = Math.abs(p2.x - p1.x), height = Math.abs(p2.y - p1.y)
+    if (width < 0.5 || height < 0.5) return
+    addObject({
+      id: crypto.randomUUID(), type: 'rect', x: Math.min(p1.x, p2.x), y: Math.min(p1.y, p2.y), width, height,
+      ...strokeProps(), fillEnabled: drawStyle.fillEnabled, fillColor: drawStyle.fillColor,
+    })
+  }
+
   const finishClickSegment = (s: Segment) => {
     if (dist(s.p1, s.p2) < 1) return
     if (tool === 'quote') {
@@ -560,7 +594,11 @@ export function Canvas({
 
   const applyCrop = () => {
     if (selected?.type === 'image' && cropPoints && cropPoints.length > 2) {
-      updateObject(selected.id, o => ({ ...o, clipPoints: cropPoints }))
+      // i punti sono presi sull'immagine come appare: se è specchiata si riportano al file originale
+      updateObject(selected.id, o => ({
+        ...o,
+        clipPoints: o.type === 'image' && o.flipX ? cropPoints.map(p => ({ x: o.width - p.x, y: p.y })) : cropPoints,
+      }))
     }
     setCropPoints(null)
     setTool('select')
@@ -598,7 +636,9 @@ export function Canvas({
 
     // Anteprime degli strumenti a clic
     if (!a) {
-      if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
+      if (segment && tool === 'rect') {
+        setSegment({ ...segment, p2: rectCorner(e, segment.p1) })
+      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -618,14 +658,8 @@ export function Canvas({
       case 'segment':
         setSegment(s => {
           if (!s) return s
-          if (tool === 'rect' || tool === 'circle') {
-            let p = pick(e)
-            if (tool === 'rect' && e.shiftKey) {
-              const d = Math.max(Math.abs(p.x - s.p1.x), Math.abs(p.y - s.p1.y))
-              p = { x: s.p1.x + Math.sign(p.x - s.p1.x || 1) * d, y: s.p1.y + Math.sign(p.y - s.p1.y || 1) * d }
-            }
-            return { ...s, p2: p }
-          }
+          if (tool === 'rect') return { ...s, p2: rectCorner(e, s.p1) }
+          if (tool === 'circle') return { ...s, p2: pick(e) }
           return { ...s, p2: pick(e, s.p1) }
         })
         return
@@ -716,6 +750,14 @@ export function Canvas({
         updateObject(a.id, o => (o.type === 'text' ? { ...o, leader: pick(e, undefined, a.id) } : o))
         return
 
+      case 'leaderText': {
+        // sposta solo il testo: la punta della freccia resta dov'è
+        const p = pick(e, undefined, a.id)
+        const dx = p.x - a.attach.x, dy = p.y - a.attach.y
+        updateObject(a.id, o => (o.type === 'text' ? { ...o, x: a.ox + dx, y: a.oy + dy } : o))
+        return
+      }
+
       case 'rotate': {
         const angle = (Math.atan2(w.y - a.cy, w.x - a.cx) * 180) / Math.PI
         let rot = a.initial + angle - a.startAngle
@@ -763,14 +805,13 @@ export function Canvas({
 
     if (a.kind === 'segment' && segment) {
       const { p1, p2 } = segment
+      const clickOnly = dist(p1, p2) < dragPx() / zoom
+      // rettangolo: un semplice clic fissa il primo vertice, il secondo clic chiude
+      if (tool === 'rect' && clickOnly) return
       setSegment(null)
       const fill = { fillEnabled: drawStyle.fillEnabled, fillColor: drawStyle.fillColor }
-      const clickOnly = dist(p1, p2) < dragPx() / zoom
       if (tool === 'rect') {
-        const r = clickOnly
-          ? { x: p1.x - 60, y: p1.y - 40, width: 120, height: 80 }
-          : { x: Math.min(p1.x, p2.x), y: Math.min(p1.y, p2.y), width: Math.abs(p2.x - p1.x), height: Math.abs(p2.y - p1.y) }
-        addObject({ id: crypto.randomUUID(), type: 'rect', ...r, ...strokeProps(), ...fill })
+        addRect(p1, p2)
         return
       }
       if (tool === 'circle') {

@@ -78,7 +78,7 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
       const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
-      return fromPoints(pts.map(p => ({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale })))
+      return fromPoints(pts.map(profileToWorld(o)))
     }
   }
 }
@@ -111,6 +111,55 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     default:
       return { ...o, x: o.x + dx, y: o.y + dy }
   }
+}
+
+/** Dalle coordinate del profilo (mm) alla tela, non ruotate, con l'eventuale specchiatura */
+export const profileToWorld = (o: Extract<CanvasObject, { type: 'profile' }>) => {
+  const cx = getObjectCenter(o).x
+  return (p: Point): Point => {
+    const x = o.x + p.x * o.scale
+    return { x: o.flipX ? 2 * cx - x : x, y: o.y + p.y * o.scale }
+  }
+}
+
+/** Trasformazione SVG della specchiatura attorno all'asse verticale del centro */
+export const flipTransform = (o: CanvasObject): string | undefined =>
+  (o.type === 'profile' || o.type === 'image') && o.flipX ? `matrix(-1 0 0 1 ${2 * getObjectCenter(o).x} 0)` : undefined
+
+/**
+ * Specchia un oggetto rispetto alla retta verticale x = ax.
+ * Le forme ruotate cambiano verso di rotazione; testi e simboli restano leggibili.
+ */
+export const mirrorObject = (o: CanvasObject, ax: number): CanvasObject => {
+  const mx = (p: Point): Point => ({ x: 2 * ax - p.x, y: p.y })
+  const rot = o.rotation ? -o.rotation : o.rotation
+  if (isEndpoint(o)) {
+    const p1 = mx({ x: o.x1, y: o.y1 })
+    const p2 = mx({ x: o.x2, y: o.y2 })
+    // lamiera e quota stanno su un lato della linea: invertendo le estremità restano dalla stessa parte
+    if (o.type === 'deck' || o.type === 'quote') return { ...o, x1: p2.x, y1: p2.y, x2: p1.x, y2: p1.y }
+    const m = { ...o, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
+    // cordone: S·R(r)·F = R(-r)·S·F
+    if (m.type === 'weld') return { ...m, beadRot: (4 - (m.beadRot ?? 0)) % 4, beadFlip: !m.beadFlip }
+    return m
+  }
+  if (o.type === 'polyline') return { ...o, points: o.points.map(mx), rotation: rot }
+  const c = getObjectCenter(o)
+  const moved = translateObject(o, 2 * ax - 2 * c.x, 0)
+  if (moved.type === 'text') return { ...moved, rotation: rot, leader: o.type === 'text' && o.leader ? mx(o.leader) : undefined }
+  if (moved.type === 'profile' || moved.type === 'image') return { ...moved, rotation: rot, flipX: !moved.flipX }
+  return { ...moved, rotation: rot }
+}
+
+/** Specchia la selezione rispetto all'asse verticale del suo centro (oggetti bloccati esclusi) */
+export const mirrorObjects = (objects: CanvasObject[], ids: string[]): CanvasObject[] => {
+  const sel = objects.filter(o => ids.includes(o.id) && !o.locked)
+  if (!sel.length) return objects
+  const ax = sel.length === 1 ? getObjectCenter(sel[0]).x : (() => {
+    const u = unionBounds(sel)!
+    return (u.minX + u.maxX) / 2
+  })()
+  return objects.map(o => (sel.includes(o) ? mirrorObject(o, ax) : o))
 }
 
 /** Punto di riferimento usato per il trascinamento */
@@ -219,7 +268,7 @@ export const getSnapPoint = (
       const profile = findProfile(o.profileName)
       if (profile) {
         const pts = getBeamPoints({ ...profile, viewType: o.viewType, length: o.length })
-        addRing(pts.map(p => r({ x: o.x + p.x * o.scale, y: o.y + p.y * o.scale })), true)
+        addRing(pts.map(p => r(profileToWorld(o)(p))), true)
       }
     } else if (o.type === 'polyline') {
       addRing(o.points.map(r), o.closed && o.points.length > 2)

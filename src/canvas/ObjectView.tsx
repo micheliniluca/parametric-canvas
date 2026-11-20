@@ -9,7 +9,7 @@ import { weldDrawing } from '../utils/weldUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
 import { dashArray } from '../style'
-import { getObjectBounds, getObjectCenter, textSize } from './geometry'
+import { flipTransform, getObjectBounds, getObjectCenter, textSize } from './geometry'
 
 type Props = {
   o: CanvasObject
@@ -68,15 +68,17 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
 
     case 'image':
       return (
-        <image
-          href={imageSrcOverride ?? o.src}
-          x={o.x} y={o.y} width={o.width} height={o.height}
-          opacity={o.opacity}
-          transform={transform}
-          preserveAspectRatio="none"
-          clipPath={o.clipPoints && o.clipPoints.length > 2 ? `url(#clip-${o.id})` : undefined}
-          pointerEvents={pe} onPointerDown={down}
-        />
+        <g transform={transform}>
+          <image
+            href={imageSrcOverride ?? o.src}
+            x={o.x} y={o.y} width={o.width} height={o.height}
+            opacity={o.opacity}
+            transform={flipTransform(o)}
+            preserveAspectRatio="none"
+            clipPath={o.clipPoints && o.clipPoints.length > 2 ? `url(#clip-${o.id})` : undefined}
+            pointerEvents={pe} onPointerDown={down}
+          />
+        </g>
       )
 
     case 'polyline': {
@@ -401,7 +403,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
             {labelText}
           </text>
         )}
-        <g transform={`${transform ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onPointerDown={down} pointerEvents={pe}>
+        <g transform={`${transform ?? ''} ${flipTransform(o) ?? ''} translate(${o.x}, ${o.y}) scale(${s})`} onPointerDown={down} pointerEvents={pe}>
           <path
             d={path} fillRule="evenodd"
             fill={o.fillEnabled ? o.fillColor || '#94a3b8' : 'none'} fillOpacity={fo}

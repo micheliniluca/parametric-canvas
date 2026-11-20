@@ -69,6 +69,8 @@ export type ProfileObject = BaseObject & {
   length: number
   /** Etichetta sul disegno */
   label?: 'none' | 'name' | 'code' | 'tekla'
+  /** Specchiato rispetto all'asse verticale del proprio centro */
+  flipX?: boolean
 }
 
 export type PolylineObject = {
@@ -97,6 +99,8 @@ export type ImageObject = BaseObject & {
   height: number
   opacity: number
   clipPoints?: Point[]
+  /** Specchiata rispetto all'asse verticale del proprio centro */
+  flipX?: boolean
 }
 
 export type ArrowObject = BaseObject & {

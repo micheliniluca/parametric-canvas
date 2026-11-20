@@ -60,7 +60,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   line: { id: 'line', label: 'Linea', icon: Minus, shortcut: 'L', hint: 'Trascina per disegnare una linea (Shift = ortogonale)' },
   polyline: { id: 'polyline', label: 'Polilinea', icon: Activity, shortcut: 'P', hint: 'Clic per aggiungere vertici · clic sul primo punto per chiudere · doppio clic o Invio per terminare' },
   freehand: { id: 'freehand', label: 'Mano libera', icon: PenTool, shortcut: 'D', sticky: true, hint: 'Trascina per disegnare. Esc per terminare' },
-  rect: { id: 'rect', label: 'Rettangolo', icon: Square, shortcut: 'R', hint: 'Trascina per disegnare (Shift = quadrato), clic per dimensione standard' },
+  rect: { id: 'rect', label: 'Rettangolo', icon: Square, shortcut: 'R', hint: 'Clic su un vertice e clic sul vertice opposto (o trascina); Shift = quadrato' },
   circle: { id: 'circle', label: 'Cerchio', icon: Circle, shortcut: 'C', hint: 'Trascina dal centro verso il bordo, clic per dimensione standard' },
   text: { id: 'text', label: 'Testo', icon: Type, shortcut: 'T', hint: 'Clic dove inserire il testo e scrivi. Ctrl+Invio o Esc per terminare' },
   profile: { id: 'profile', label: 'Profilo', icon: IconIPE, shortcut: 'I', hint: 'Clic sulla tela per inserire il profilo scelto nel catalogo (Ctrl = snap)' },

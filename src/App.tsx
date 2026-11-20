@@ -11,7 +11,7 @@ import { StatusBar } from './StatusBar'
 import { useHistory } from './hooks/useHistory'
 import type { DrawStyle } from './style'
 import { DEFAULT_STYLE, stylePatchFor } from './style'
-import { alignObjects, getObjectBounds, translateObject } from './canvas/geometry'
+import { alignObjects, getObjectBounds, mirrorObjects, translateObject } from './canvas/geometry'
 import type { AlignKind } from './canvas/geometry'
 import { captureSvgToClipboard } from './utils/capture'
 import { migrateObjects } from './utils/boltUtils'
@@ -272,6 +272,8 @@ export default function App() {
     notify('Gruppo sciolto')
   }
 
+  const mirror = () => setObjects(objs => mirrorObjects(objs, selectedIds))
+
   const align = (kind: AlignKind) => setObjects(objs => alignObjects(objs, selectedIds, kind))
 
   const screenshot = () => {
@@ -457,6 +459,7 @@ export default function App() {
         onDelete={deleteSelected}
         onPaste={pasteFromClipboard}
         onToggleLock={toggleLock}
+        onMirror={mirror}
         selectionCount={selectedObjs.length}
         allLocked={selectedObjs.length > 0 && selectedObjs.every(o => o.locked)}
         grouped={selectedObjs.some(o => o.groupId)}

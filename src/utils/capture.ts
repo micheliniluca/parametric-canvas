@@ -1,8 +1,48 @@
+/** Stesso foglio di stile importato in index.css */
+const FONT_CSS_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap'
+const FONT_STACK = "'Plus Jakarta Sans', Inter, Arial, Helvetica, sans-serif"
+
+const toDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = () => resolve(r.result as string)
+  r.onerror = reject
+  r.readAsDataURL(blob)
+})
+
+let fontFacesCache: Promise<string> | null = null
+
+/**
+ * @font-face del carattere dell'app con i file incorporati (data URL).
+ * Un SVG trasformato in immagine non vede i font della pagina né carica file esterni:
+ * senza questo i testi uscirebbero nel carattere predefinito (Times).
+ * Si tengono solo i sottoinsiemi latin e latin-ext; se la rete manca resta il ripiego su Arial.
+ */
+function embeddedFontFaces(): Promise<string> {
+  fontFacesCache ??= (async () => {
+    const css = await (await fetch(FONT_CSS_URL)).text()
+    const blocks = [...css.matchAll(/\/\*\s*(latin(?:-ext)?)\s*\*\/\s*(@font-face\s*{[^}]*})/g)].map(m => m[2])
+    const urls = [...new Set(blocks.flatMap(b => [...b.matchAll(/url\((https:[^)]+)\)/g)].map(m => m[1])))]
+    const data = new Map(await Promise.all(urls.map(async u => [u, await toDataUrl(await (await fetch(u)).blob())] as const)))
+    return blocks.map(b => b.replace(/url\((https:[^)]+)\)/g, (_, u: string) => `url(${data.get(u)})`)).join('\n')
+  })().catch(err => {
+    console.warn('Carattere non incorporato nello screenshot:', err)
+    fontFacesCache = null
+    return ''
+  })
+  return fontFacesCache
+}
+
 /** Rasterizza la vista corrente del canvas in PNG (esclude maniglie e bozze, griglia opzionale). */
-async function renderSvgToPng(svgElement: SVGSVGElement, mode: 'grid' | 'white' | 'transparent'): Promise<Blob> {
+export async function renderSvgToPng(svgElement: SVGSVGElement, mode: 'grid' | 'white' | 'transparent'): Promise<Blob> {
   const clone = svgElement.cloneNode(true) as SVGSVGElement
   clone.querySelector('#ui-layer')?.remove()
   if (mode !== 'grid') clone.querySelector('#grid-layer')?.remove()
+
+  // il carattere arriva dalla pagina per ereditarietà: nell'immagine va dichiarato e incorporato
+  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+  style.textContent = `${await embeddedFontFaces()}\nsvg, text { font-family: ${FONT_STACK}; }`
+  clone.insertBefore(style, clone.firstChild)
+  clone.style.fontFamily = FONT_STACK
 
   const bbox = svgElement.getBoundingClientRect()
   clone.setAttribute('width', String(bbox.width))

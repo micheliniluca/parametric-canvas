@@ -72,6 +72,10 @@ export const lengthText = (o: WeldObject): string => {
 }
 
 /** Designazione breve per pannello e selezione */
+/** Contenuto della coda: procedimento e testo libero */
+export const tailText = (o: WeldObject): string =>
+  [o.process?.trim(), o.tailText?.trim()].filter(Boolean).join(' / ')
+
 export const weldLabel = (o: WeldObject): string => {
   const k = WELD_KINDS.find(w => w.id === o.kind)
   const name = o.side === 'both' ? k?.both : k?.label
@@ -358,11 +362,12 @@ export const weldDrawing = (o: WeldObject): WeldDrawing => {
     }
   }
 
-  // coda con il procedimento
-  if (o.process) {
+  // coda: procedimento e testo libero, separati da "/" come nella ISO 2553
+  const tail = tailText(o)
+  if (tail) {
     const tl = 0.5 * h
     lines += `M ${xEnd} ${K.y} l ${dir * tl} ${-tl} M ${xEnd} ${K.y} l ${dir * tl} ${tl} `
-    texts.push({ x: xEnd + dir * (tl + 0.25 * h), y: K.y, text: o.process, anchor: dir > 0 ? 'start' : 'end' })
+    texts.push({ x: xEnd + dir * (tl + 0.25 * h), y: K.y, text: tail, anchor: dir > 0 ? 'start' : 'end' })
   }
 
   // saldatura in opera (bandierina verso la coda) e tutto intorno
@@ -379,7 +384,7 @@ export const weldDrawing = (o: WeldObject): WeldDrawing => {
   pts.push({ x: K.x, y: K.y - ext })
   pts.push({ x: K.x, y: K.y + ext + (showDash ? dashGap : 0) })
   if (o.field) pts.push({ x: K.x, y: K.y - 1.6 * h }, { x: K.x + dir * 0.8 * h, y: K.y - 1.6 * h })
-  if (o.process) pts.push({ x: xEnd + dir * (0.75 * h + textW(o.process, h)), y: K.y })
+  if (tail) pts.push({ x: xEnd + dir * (0.75 * h + textW(tail, h)), y: K.y })
   for (const p of bead.flat()) pts.push(p)
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y)
   const minX = Math.min(...xs), minY = Math.min(...ys)

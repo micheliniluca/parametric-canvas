@@ -430,6 +430,10 @@ function WeldProps({ o, onChange }: { o: WeldObject; onChange: (patch: Partial<C
             {WELD_PROCESSES.filter(p => p.code).map(p => <option key={p.code} value={p.code}>{p.label}</option>)}
           </datalist>
         </Field>
+        <Field label="Testo nella coda" full>
+          <input value={o.tailText ?? ''} placeholder="es. ISO 5817-C, PA, vedi dett. 3"
+            onChange={e => onChange({ tailText: e.target.value })} />
+        </Field>
       </div>
 
       <h4>Cordone in sezione</h4>

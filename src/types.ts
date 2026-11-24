@@ -217,6 +217,8 @@ export type WeldObject = BaseObject & {
   contour?: 'none' | 'flat' | 'convex' | 'concave'
   /** Procedimento nella coda (ISO 4063 o sigla AWS) */
   process?: string
+  /** Testo libero nella coda (es. livello di qualità, posizione, rimando a un dettaglio), dopo il procedimento */
+  tailText?: string
   /** Disegna il cordone in sezione sulla punta della freccia, in scala reale */
   showBead?: boolean
   /** Spessore della lamiera (testa a testa) o dell'anima (angolo su due lati), mm */

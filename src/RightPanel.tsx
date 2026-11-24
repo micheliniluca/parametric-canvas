@@ -18,7 +18,7 @@ import {
 import {
   WELD_KINDS, WELD_PROCESSES, defaultBeadRot, filletLeg, filletThroat, isButt, weldLabel,
 } from './utils/weldUtils'
-import { defaultLeaderTip } from './utils/leaderUtils'
+import { defaultLeaderTip, leaderWidth } from './utils/leaderUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
@@ -787,6 +787,11 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
                 <option value="dot">Punto</option>
                 <option value="none">Nessuno</option>
               </select>
+            </Field>
+          )}
+          {o.leader && (
+            <Field label="Spessore richiamo">
+              <Num value={leaderWidth(o)} min={0.1} step={0.1} onChange={v => onChange({ leaderWidth: v })} />
             </Field>
           )}
           {o.leader && (

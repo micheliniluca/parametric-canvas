@@ -16,6 +16,9 @@ export type TextLeader = {
   width: number
 }
 
+/** Spessore della linea di richiamo: quello scelto, oppure proporzionale al testo */
+export const leaderWidth = (o: TextObject): number => o.leaderWidth ?? Math.max(0.5, (o.fontSize || 20) / 16)
+
 export const textLeader = (o: TextObject): TextLeader | null => {
   if (!o.leader) return null
   const fs = o.fontSize || 20
@@ -29,11 +32,13 @@ export const textLeader = (o: TextObject): TextLeader | null => {
   const landing = Math.min(fs * 0.8, Math.max(0, Math.abs(tipL.x - sideX)))
   const start = { x: sideX, y: c.y }
   const elbow = { x: sideX + (right ? landing : -landing), y: c.y }
+  const width = leaderWidth(o)
   return {
     pts: [rotatePoint(start, c, rot), rotatePoint(elbow, c, rot), { ...o.leader }],
     end: o.leaderEnd ?? 'arrow',
-    size: Math.max(4, fs * 0.6),
-    width: Math.max(0.5, fs / 16),
+    // con una linea spessa la freccia cresce, altrimenti sparirebbe sotto la linea
+    size: Math.max(4, fs * 0.6, width * 5),
+    width,
   }
 }
 

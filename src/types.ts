@@ -57,6 +57,8 @@ export type TextObject = BaseObject & {
   leader?: Point
   /** Terminale della linea di richiamo */
   leaderEnd?: 'arrow' | 'dot' | 'none'
+  /** Spessore della linea di richiamo (mm); assente = proporzionale all'altezza del testo */
+  leaderWidth?: number
 }
 
 export type ProfileObject = BaseObject & {

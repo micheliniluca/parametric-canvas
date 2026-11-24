@@ -29,7 +29,7 @@ npm run dev
 | D | Mano libera (resta attiva, Esc per uscire) |
 | L / P / A | Linea / Polilinea / Freccia |
 | R / C | Rettangolo: clic sui due vertici della diagonale (o trascina) / Cerchio: trascina; Shift = quadrato |
-| T | Testo: clic e scrivi; doppio clic su un testo per modificarlo; linea di richiamo dal pannello, con due maniglie: la punta della freccia e il gomito, che sposta il testo |
+| T | Testo: clic e scrivi; doppio clic su un testo per modificarlo; linea di richiamo dal pannello, con due maniglie: la punta della freccia e il gomito, che sposta il testo; terminale e spessore regolabili |
 | I | Profilo: scegli nel catalogo (si apre da solo) e clicca sulla tela per inserirlo |
 | N | Bollino numerato: ogni clic sulla tela aggiunge il numero successivo, fino a Esc o a un altro strumento |
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |

@@ -11,15 +11,17 @@ import { leaderTerminal, textLeader } from './leaderUtils'
 import { quoteTerminals } from './quoteUtils'
 import { getObjectBounds, getObjectCenter, profileToWorld, rotatePoint, textSize } from '../canvas/geometry'
 import { pathToPolylines } from './pathToPolylines'
+import { hatchDef, hatchGeometry } from './hatchUtils'
 
 /**
  * Esportazione DXF (formato R12, letto da AutoCAD, Tekla, LibreCAD, BricsCAD…).
  * Unità: millimetri, 1 unità della tela = 1 mm. L'asse Y viene ribaltato (in DXF cresce verso l'alto).
  * Un layer per tipo di oggetto; il colore del tratto viene convertito nel colore AutoCAD (ACI) più vicino.
  * Le immagini e i riempimenti non vengono esportati, tranne le campiture piene delle saldature (SOLID).
+ * I retini dei materiali vengono esplosi in linee e puntini sul layer RETINI.
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI' | 'RETINI'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -36,6 +38,7 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'INVOLUCRO', color: 150, ltype: 'CONTINUOUS' },
   { name: 'NASCOSTE', color: 8, ltype: 'DASHED' },
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
+  { name: 'RETINI', color: 9, ltype: 'CONTINUOUS' },
 ]
 
 type Ent =
@@ -142,26 +145,42 @@ function entitiesOf(o: CanvasObject): Ent[] {
   const fill = (layer: Layer, polygon: Point[]) => {
     for (const t of triangulate(polygon)) out.push({ kind: 'solid', layer, color, pts: [R(t[0]), R(t[1]), R(t[2])] })
   }
+  /** retino del materiale dentro il contorno (coordinate prima della rotazione) */
+  const hatch = (polygon: Point[]) => {
+    const def = hatchDef(o.pattern)
+    if (!def || polygon.length < 3) return
+    const g = hatchGeometry(def, polygon, o.patternScale ?? 1, o.patternAngle ?? 0)
+    if (!g) return
+    for (const pl of g.segs) poly('RETINI', pl, false)
+    for (const d of g.dots) out.push({ kind: 'circle', layer: 'RETINI', color, c: R(d), r: d.r })
+  }
   const text = (layer: Layer, p: Point, fontSize: number, t: string, rot: number,
     align: 'left' | 'center', valign: 'baseline' | 'middle', c = color) => {
     if (t.trim()) out.push({ kind: 'text', layer, color: c, p: R(p), height: fontSize * CAP, text: t, rot: rot + rotation, align, valign })
   }
 
   switch (o.type) {
-    case 'rect':
-      poly('DISEGNO', [
+    case 'rect': {
+      const pts = [
         { x: o.x, y: o.y }, { x: o.x + o.width, y: o.y }, { x: o.x + o.width, y: o.y + o.height }, { x: o.x, y: o.y + o.height },
-      ], true)
+      ]
+      poly('DISEGNO', pts, true)
+      hatch(pts)
       break
+    }
 
     case 'circle':
-      out.push({ kind: 'circle', layer: 'DISEGNO', color, c: { x: o.x, y: o.y }, r: o.radius })
+      out.push({ kind: 'circle', layer: 'DISEGNO', color, c: R({ x: o.x, y: o.y }), r: o.radius })
+      if (o.pattern) hatch(Array.from({ length: 96 }, (_, i) => ({
+        x: o.x + o.radius * Math.cos((i / 96) * 2 * Math.PI), y: o.y + o.radius * Math.sin((i / 96) * 2 * Math.PI),
+      })))
       break
 
     case 'polyline': {
       const closed = o.closed && o.points.length > 2
       const pts = closed ? o.points.slice(0, -1) : o.points
       poly('DISEGNO', pts, closed)
+      if (closed) hatch(pts)
       break
     }
 

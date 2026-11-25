@@ -46,6 +46,7 @@ npm run dev
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |
 | Ctrl+Z / Ctrl+Y | Annulla / Ripeti |
 | Ctrl+C / Ctrl+V / Ctrl+D | Copia / Incolla (oggetti, immagini o testo; anche dal pulsante Incolla) / Duplica |
+| Retino (pannello) | Rettangoli, cerchi e poligoni chiusi: 21 retini di materiali (calcestruzzo, c.a., acciaio, legno, laterizio pieno e forato, blocchi, pietra, terreno, ghiaia, sabbia, magrone, riporto, isolante rigido, lana minerale, intonaco, cartongesso, vetro, impermeabilizzazione, acqua) con scala e angolo; nel DXF esplosi in linee sul layer RETINI |
 | Pulsante Specchia | Specchia la selezione sinistra ↔ destra (con la rotazione di 180° si ottiene alto ↔ basso) |
 | Ctrl+S / Ctrl+O | Salva / Apri progetto (`.pcanvas.json`) |
 | Ctrl+0, + / − | Adatta alla vista, zoom |
@@ -89,6 +90,7 @@ src/
   utils/weldUtils.ts   simboli di saldatura ISO/AWS e cordone in sezione
   utils/envelopeUtils.ts  involucro in sezione: isolante, pannello sandwich, vetro, Aquapanel, copertura aggraffata
   utils/screwUtils.ts  viti: dimensioni normalizzate, vista laterale e dalla testa
+  utils/hatchUtils.ts  retini dei materiali: moduli ripetibili e ritaglio per l'export DXF
   utils/boltUtils.ts   dimensioni ISO dei bulloni, viste, lunghezza, conversione dei vecchi disegni
   icons.tsx            icone tecniche (bullone, IPE, quota ISO)
 ```

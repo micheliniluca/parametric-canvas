@@ -24,8 +24,10 @@ import { defaultLeaderTip, leaderWidth } from './utils/leaderUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
+import { HATCHES, HATCH_GROUPS, hatchDef } from './utils/hatchUtils'
+import { HatchPattern } from './canvas/HatchPattern'
 import {
-  Database, Download, SlidersHorizontal, MousePointerClick,
+  Ban, Database, Download, SlidersHorizontal, MousePointerClick,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
@@ -743,6 +745,46 @@ function ScrewProps({ o, onChange }: { o: ScrewObject; onChange: (patch: Partial
   )
 }
 
+/** Retino del materiale per rettangoli, cerchi e poligoni */
+function HatchProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const cur = hatchDef(o.pattern)
+  return (
+    <>
+      <h4>Retino{cur ? <span className="muted hatch-current"> · {cur.label}</span> : null}</h4>
+      <div className="hatch-picker">
+        {HATCH_GROUPS.map((g, gi) => (
+          <div key={g} className="hatch-group">
+            <span className="hatch-group-label">{g}</span>
+            <div className="hatch-grid">
+              {gi === 0 && (
+                <button type="button" title="Nessun retino" className={`hatch-swatch hatch-none ${!cur ? 'active' : ''}`}
+                  onClick={() => onChange({ pattern: undefined })}>
+                  <Ban size={14} />
+                </button>
+              )}
+              {HATCHES.filter(h => h.group === g).map(h => (
+                <button key={h.id} type="button" title={h.label} className={`hatch-swatch ${o.pattern === h.id ? 'active' : ''}`}
+                  onClick={() => onChange({ pattern: h.id })}>
+                  <svg width="30" height="30">
+                    <HatchPattern id={`hatch-swatch-${h.id}`} def={h} color="currentColor" lineWidth={0.6} />
+                    <rect width="30" height="30" fill={`url(#hatch-swatch-${h.id})`} />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {cur && (
+        <div className="prop-grid">
+          <Field label="Scala"><Num value={o.patternScale ?? 1} min={0.05} step={0.25} onChange={v => onChange({ patternScale: v })} /></Field>
+          <Field label="Angolo (°)"><Num value={o.patternAngle ?? 0} step={15} onChange={v => onChange({ patternAngle: v })} /></Field>
+        </div>
+      )}
+    </>
+  )
+}
+
 function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   const p = deckProfile(o.profile)
   const t = deckThickness(o)
@@ -1229,6 +1271,8 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
           </button>
         </div>
       )}
+
+      {(o.type === 'rect' || o.type === 'circle' || (o.type === 'polyline' && o.closed)) && <HatchProps o={o} onChange={onChange} />}
 
       <Transparency objs={[o]} onChange={onChange} />
 

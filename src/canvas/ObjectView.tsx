@@ -11,6 +11,9 @@ import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seam
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
 import { dashArray } from '../style'
+import { hatchDef, hatchLineWidth } from '../utils/hatchUtils'
+import { HatchPattern } from './HatchPattern'
+import type { ReactElement } from 'react'
 import { flipTransform, getObjectBounds, getObjectCenter, textSize } from './geometry'
 
 type Props = {
@@ -33,6 +36,20 @@ export function ObjectView(props: Props) {
   return op < 1 ? <g opacity={op}>{el}</g> : el
 }
 
+/** Retino del materiale sopra la forma: `shape` disegna la stessa geometria con il riempimento dato */
+function hatchLayer(o: CanvasObject, shape: (fill: string) => ReactElement) {
+  const def = hatchDef(o.pattern)
+  if (!def) return null
+  const id = `hatch-${o.id}`
+  return (
+    <>
+      <HatchPattern id={id} def={def} scale={o.patternScale} angle={o.patternAngle}
+        color={o.stroke || '#0f172a'} lineWidth={hatchLineWidth(o.strokeWidth)} />
+      {shape(`url(#${id})`)}
+    </>
+  )
+}
+
 function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, imageSrcOverride }: Props) {
   const fo = o.fillOpacity
   const pe = interactive ? 'all' : 'none'
@@ -45,20 +62,23 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
   switch (o.type) {
     case 'rect': {
       const sw = o.strokeWidth ?? 2
-      return (
+      const hatch = hatchLayer(o, f => <rect x={o.x} y={o.y} width={o.width} height={o.height} fill={f} stroke="none" pointerEvents="none" />)
+      const shape = (
         <rect
           x={o.x} y={o.y} width={o.width} height={o.height}
-          transform={transform}
+          transform={hatch ? undefined : transform}
           fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
           stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray(o.strokeDash, sw)}
           pointerEvents={pe} onPointerDown={down}
         />
       )
+      return hatch ? <g transform={transform}>{shape}{hatch}</g> : shape
     }
 
     case 'circle': {
       const sw = o.strokeWidth ?? 2
-      return (
+      const hatch = hatchLayer(o, f => <circle cx={o.x} cy={o.y} r={o.radius} fill={f} stroke="none" pointerEvents="none" />)
+      const shape = (
         <circle
           cx={o.x} cy={o.y} r={o.radius}
           fill={o.fillEnabled ? o.fillColor || '#cbd5e1' : 'none'} fillOpacity={fo}
@@ -66,6 +86,8 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           pointerEvents={pe} onPointerDown={down}
         />
       )
+      // il retino ruota con il cerchio
+      return hatch ? <g transform={transform}>{shape}{hatch}</g> : shape
     }
 
     case 'image':
@@ -109,6 +131,7 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
             pointerEvents={interactive ? (o.closed ? 'all' : 'stroke') : 'none'} onPointerDown={down}
           />
           )}
+          {o.closed && hatchLayer(o, f => <polygon points={pts} fill={f} stroke="none" pointerEvents="none" />)}
         </g>
       )
     }

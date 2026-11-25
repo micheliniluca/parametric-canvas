@@ -17,9 +17,21 @@ export type BaseObject = {
   opacity?: number
   /** Opacità del solo riempimento, 0–1 (assente = 1) */
   fillOpacity?: number
+  /** Retino del materiale (forme chiuse) */
+  pattern?: HatchId
+  patternScale?: number
+  /** Angolo del retino in gradi */
+  patternAngle?: number
 }
 
 export type StrokeDash = 'solid' | 'dashed' | 'dotted'
+
+/** Retini dei materiali da costruzione (catalogo in utils/hatchUtils) */
+export type HatchId =
+  | 'concrete' | 'rc' | 'steel' | 'timber' | 'timberEnd'
+  | 'brick' | 'hollowBrick' | 'block' | 'stone'
+  | 'soil' | 'gravel' | 'sand' | 'lean' | 'fill'
+  | 'xps' | 'wool' | 'plaster' | 'board' | 'glass' | 'membrane' | 'water'
 
 export type QuoteObject = BaseObject & {
   type: 'quote'
@@ -92,6 +104,11 @@ export type PolylineObject = {
   groupId?: string
   opacity?: number
   fillOpacity?: number
+  /** Retino del materiale (forme chiuse) */
+  pattern?: HatchId
+  patternScale?: number
+  /** Angolo del retino in gradi */
+  patternAngle?: number
 }
 
 export type ImageObject = BaseObject & {

@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam'
   x: number
   y: number
   stroke?: string
@@ -232,6 +232,51 @@ export type WeldObject = BaseObject & {
   textSize?: number
 }
 
+/**
+ * Elemento d'involucro in sezione: isolante, pannello sandwich o vetrata.
+ * La linea è la faccia d'appoggio; lo spessore cresce verso l'alto dello schermo (o dall'altra parte con flip).
+ */
+export type EnvelopeObject = BaseObject & {
+  type: 'envelope'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  kind: 'insulation' | 'sandwich' | 'glass'
+  /** Spessore (isolante, pannello) in mm */
+  thickness: number
+  /** Dall'altra parte della linea */
+  flip?: boolean
+  /** Sandwich: faccia esterna piana (parete) o grecata (copertura) */
+  ribs?: 'flat' | 'roof'
+  ribHeight?: number
+  ribPitch?: number
+  /** Sandwich: spessore delle lamiere e larghezza utile del pannello (giunti); 0 = senza giunti */
+  skin?: number
+  module?: number
+  /** Vetro: composizione, es. 6/16/6 o 33.1/16/6 */
+  glazing?: string
+  showLabel?: boolean
+}
+
+/** Copertura a giunti aggraffati (standing seam) in sezione: la linea è il piano di posa */
+export type SeamObject = BaseObject & {
+  type: 'seam'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  seam: 'double' | 'angle' | 'snap'
+  /** Altezza della nervatura (mm) */
+  height: number
+  /** Passo di posa = larghezza utile della lastra (mm) */
+  pitch: number
+  /** Spessore della lamiera (mm), per l'etichetta */
+  thickness: number
+  flip?: boolean
+  showLabel?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -243,4 +288,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject

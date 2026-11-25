@@ -6,6 +6,7 @@ import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUt
 import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
 import { weldDrawing } from '../utils/weldUtils'
+import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from '../utils/envelopeUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
 import { dashArray } from '../style'
@@ -332,6 +333,41 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
             <text transform={`translate(${lp.pos.x}, ${lp.pos.y}) rotate(${lp.angle})`} fontSize={lp.fontSize} fill={stroke}
               textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>
               {deckLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'envelope':
+    case 'seam': {
+      const sw = o.strokeWidth ?? (o.type === 'seam' ? 1.5 : 1)
+      const dr = o.type === 'envelope' ? envelopeDrawing(o) : seamDrawing(o)
+      const fill = o.fillEnabled ? o.fillColor || '#fef9c3' : 'none'
+      const above = o.type === 'envelope' ? envelopeThickness(o) + (o.kind === 'sandwich' && o.ribs === 'roof' ? o.ribHeight ?? 40 : 0) : o.height
+      const lp = o.showLabel ? labelPlacement(dr, above) : null
+      return (
+        <g transform={transform} onPointerDown={down}>
+          {/* area di presa lungo la linea d'appoggio */}
+          <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent" strokeWidth={14}
+            vectorEffect="non-scaling-stroke" pointerEvents={interactive ? 'stroke' : 'none'} />
+          {dr.fill && (
+            <path d={dr.fill} fill={fill} fillOpacity={fo} stroke={stroke} strokeWidth={sw}
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
+          )}
+          {dr.thin && (
+            <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.6} vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round" pointerEvents="none" />
+          )}
+          {dr.lines && (
+            <path d={dr.lines} fill="none" stroke={stroke} strokeWidth={sw} vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round" pointerEvents={interactive ? 'stroke' : 'none'} />
+          )}
+          {dr.solid && <path d={dr.solid} fill={stroke} stroke={stroke} strokeWidth={sw * 0.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+          {lp && (
+            <text transform={`translate(${lp.pos.x}, ${lp.pos.y}) rotate(${lp.angle})`} fontSize={lp.fontSize} fill={stroke}
+              textAnchor="middle" dominantBaseline="middle" pointerEvents="none" style={{ userSelect: 'none' }}>
+              {o.type === 'envelope' ? envelopeLabel(o) : seamLabel(o)}
             </text>
           )}
         </g>

@@ -79,6 +79,8 @@ export const styleCaps = (o: CanvasObject | null) => {
     case 'cable':
     case 'deck': return { stroke: true, width: true, dash: false, fill: true }
     case 'weld': return { stroke: true, width: true, dash: false, fill: false }
+    case 'envelope': return { stroke: true, width: true, dash: false, fill: true }
+    case 'seam': return { stroke: true, width: true, dash: false, fill: false }
     case 'text': return { stroke: true, width: false, dash: false, fill: true }
     case 'polyline': return { stroke: true, width: true, dash: true, fill: o.closed }
     default: return { stroke: true, width: true, dash: true, fill: true }

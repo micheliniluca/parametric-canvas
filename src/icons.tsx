@@ -41,6 +41,23 @@ export const IconDeck = ({ size }: Props) => (
   </Svg>
 )
 
+/** Involucro: pannello con isolante a spirale */
+export const IconEnvelope = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 2 6.5 H 22 M 2 17.5 H 22" strokeWidth={1.6} />
+    <path d="M 4 9.5 A 1.6 1.6 0 0 1 7.2 9.5 L 5.6 14.5 A 1.6 1.6 0 0 0 8.8 14.5 L 7.2 9.5 M 10.4 9.5 A 1.6 1.6 0 0 1 13.6 9.5 L 12 14.5 A 1.6 1.6 0 0 0 15.2 14.5 L 13.6 9.5 M 16.8 9.5 A 1.6 1.6 0 0 1 20 9.5 L 18.4 14.5" strokeWidth={1.1} />
+  </Svg>
+)
+
+/** Copertura a giunti aggraffati */
+export const IconSeam = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 1.5 17 H 6.3 V 8 M 7.7 8 V 17 H 16.3 V 8 M 17.7 8 V 17 H 22.5" strokeWidth={1.5} strokeLinejoin="round" />
+    <rect x="5.5" y="6.5" width="3" height="3.2" fill="currentColor" strokeWidth={0.8} />
+    <rect x="15.5" y="6.5" width="3" height="3.2" fill="currentColor" strokeWidth={0.8} />
+  </Svg>
+)
+
 /** Simbolo di saldatura: freccia, linea di riferimento e cordone d'angolo */
 export const IconWeld = ({ size }: Props) => (
   <Svg size={size}>

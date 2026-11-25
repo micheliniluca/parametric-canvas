@@ -38,6 +38,8 @@ npm run dev
 | H | Lamiera grecata (ComFlor 46, 60, 80, 100): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | W | Saldatura (ISO 2553 o AWS A2.4): clic sul giunto, clic dove va la linea di riferimento; tipo (angolo, I, V, mezza V, Y, mezza Y, U, J; su due lati X, K…), lato, quote, a tratti, tutto intorno, in opera, finitura, coda con procedimento e testo libero; cordone pieno in scala sulla punta della freccia |
+| E | Involucro in sezione: clic su inizio e fine della faccia d'appoggio; isolante (retino a spirale), pannello sandwich (parete piana o copertura grecata, giunti) o vetro (composizione tipo 6/16/6, 33.1/16/6, con distanziatori); spessore e lato nel pannello |
+| U | Copertura aggraffata (standing seam) in sezione: clic su inizio e fine del piano di posa; doppia aggraffatura, angolare o a scatto, altezza nervatura e passo di posa |
 | Q / M | Quota (frecce o trattino obliquo alle estremità, nel pannello) / Misura |
 | S / O / G | Attiva SNAP / ORTO / GRIGLIA |
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |
@@ -84,6 +86,7 @@ src/
   data/profiles.json   database profili Maffeis (generato dal CSV, vedi sotto)
   beamPath.ts          geometria delle sezioni (I, U, L, T, tubolari) e viste laterali
   utils/weldUtils.ts   simboli di saldatura ISO/AWS e cordone in sezione
+  utils/envelopeUtils.ts  involucro in sezione: isolante, pannello sandwich, vetro, copertura aggraffata
   utils/boltUtils.ts   dimensioni ISO dei bulloni, viste, lunghezza, conversione dei vecchi disegni
   icons.tsx            icone tecniche (bullone, IPE, quota ISO)
 ```

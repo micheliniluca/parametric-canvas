@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, DeckObject, WeldObject } from './types'
+import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, SeamObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { MaffeisLogo } from './components/MaffeisLogo'
@@ -18,6 +18,7 @@ import {
 import {
   WELD_KINDS, WELD_PROCESSES, defaultBeadRot, filletLeg, filletThroat, isButt, weldLabel,
 } from './utils/weldUtils'
+import { ENVELOPE_KINDS, SEAM_TYPES, envelopeLabel, envelopeThickness, seamLabel } from './utils/envelopeUtils'
 import { defaultLeaderTip, leaderWidth } from './utils/leaderUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
@@ -59,6 +60,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
   symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
+  envelope: 'Involucro', seam: 'Copertura aggraffata',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -458,6 +460,139 @@ function WeldProps({ o, onChange }: { o: WeldObject; onChange: (patch: Partial<C
         <Field label="Altezza testo">
           <Num value={o.textSize ?? 14} min={1} onChange={v => onChange({ textSize: v })} />
         </Field>
+      </div>
+    </>
+  )
+}
+
+/** Lunghezza della linea, con il punto finale spostato lungo la sua direzione */
+function LineLength({ o, onChange, label }: { o: { x1: number; y1: number; x2: number; y2: number }; onChange: (patch: Partial<CanvasObject>) => void; label: string }) {
+  const L = Math.hypot(o.x2 - o.x1, o.y2 - o.y1)
+  const u = L > 0 ? { x: (o.x2 - o.x1) / L, y: (o.y2 - o.y1) / L } : { x: 1, y: 0 }
+  return (
+    <Field label={label}>
+      <Num value={L} min={1} onChange={v => onChange({ x2: o.x1 + u.x * v, y2: o.y1 + u.y * v })} />
+    </Field>
+  )
+}
+
+const GLAZING_PRESETS = ['4/16/4', '6/16/6', '33.1/16/6', '44.2/16/33.1', '6/16/44.2', '4/12/4/12/4', '6/14/4/14/33.1', '10', '44.2']
+
+function EnvelopeProps({ o, onChange }: { o: EnvelopeObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const setKind = (kind: EnvelopeObject['kind']) => {
+    if (kind === o.kind) return
+    const was = ENVELOPE_KINDS.find(k => k.id === o.kind)!.fill
+    // il riempimento segue il tipo, a meno che non sia stato cambiato a mano
+    const patch: Partial<EnvelopeObject> = { kind }
+    if (!o.fillColor || o.fillColor === was) patch.fillColor = ENVELOPE_KINDS.find(k => k.id === kind)!.fill
+    if (kind === 'sandwich' && o.kind === 'insulation' && o.thickness > 200) patch.thickness = 100
+    onChange(patch)
+  }
+  const glass = o.kind === 'glass'
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{envelopeLabel(o)}</div>
+        <div className="muted">Sezione · spessore totale {round1(envelopeThickness(o))} mm</div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Tipo" full>
+          <div className="segmented">
+            {ENVELOPE_KINDS.map(k => (
+              <button key={k.id} type="button" className={o.kind === k.id ? 'active' : ''} onClick={() => setKind(k.id)}>{k.label}</button>
+            ))}
+          </div>
+        </Field>
+        {!glass && (
+          <Field label="Spessore (mm)"><Num value={o.thickness} min={1} onChange={v => onChange({ thickness: v })} /></Field>
+        )}
+        {glass && (
+          <Field label="Composizione">
+            <input list="glazing-presets" value={o.glazing ?? ''} placeholder="6/16/6"
+              onChange={e => onChange({ glazing: e.target.value })} />
+            <datalist id="glazing-presets">
+              {GLAZING_PRESETS.map(g => <option key={g} value={g} />)}
+            </datalist>
+          </Field>
+        )}
+        <LineLength o={o} onChange={onChange} label="Lunghezza (mm)" />
+        {glass && (
+          <p className="muted full-width" style={{ margin: 0 }}>
+            Dal lato della linea: lastre e intercapedini separate da «/». 33.1 = stratificato 3+3 con un PVB,
+            44.2 = 4+4 con due PVB. Distanziatori alle estremità.
+          </p>
+        )}
+      </div>
+
+      {o.kind === 'sandwich' && (
+        <>
+          <h4>Pannello</h4>
+          <div className="prop-grid">
+            <Field label="Faccia esterna" full>
+              <div className="segmented">
+                {([['flat', 'Piana (parete)'], ['roof', 'Grecata (copertura)']] as const).map(([v, l]) => (
+                  <button key={v} type="button" className={(o.ribs ?? 'flat') === v ? 'active' : ''} onClick={() => onChange({ ribs: v })}>{l}</button>
+                ))}
+              </div>
+            </Field>
+            {o.ribs === 'roof' && (
+              <>
+                <Field label="Altezza greca"><Num value={o.ribHeight ?? 40} min={5} onChange={v => onChange({ ribHeight: v })} /></Field>
+                <Field label="Passo greche"><Num value={o.ribPitch ?? 250} min={50} onChange={v => onChange({ ribPitch: v })} /></Field>
+              </>
+            )}
+            <Field label="Lamiere (mm)"><Num value={o.skin ?? 0.5} min={0} step={0.1} onChange={v => onChange({ skin: v })} /></Field>
+            <Field label="Larghezza utile"><Num value={o.module ?? 1000} min={0} onChange={v => onChange({ module: v })} /></Field>
+            <p className="muted full-width" style={{ margin: 0 }}>Larghezza utile 0 = senza giunti tra i pannelli.</p>
+          </div>
+        </>
+      )}
+
+      <div className="prop-grid">
+        <button type="button" className="btn-secondary full-width" onClick={() => onChange({ flip: !o.flip })}>
+          Inverti lato della linea
+        </button>
+        <label className="check-label full-width">
+          <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
+function SeamProps({ o, onChange }: { o: SeamObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{seamLabel(o)}</div>
+        <div className="muted">Sezione · lamiera {String(o.thickness).replace('.', ',')} mm</div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Aggraffatura" full>
+          <div className="segmented">
+            {SEAM_TYPES.map(s => (
+              <button key={s.id} type="button" className={o.seam === s.id ? 'active' : ''} onClick={() => onChange({ seam: s.id })}>{s.label}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Altezza nervatura">
+          <input list="seam-heights" value={o.height} onChange={e => {
+            const v = parseFloat(e.target.value.replace(',', '.'))
+            if (v > 0) onChange({ height: v })
+          }} />
+          <datalist id="seam-heights">{[25, 32, 38, 50, 65].map(h => <option key={h} value={h} />)}</datalist>
+        </Field>
+        <Field label="Passo di posa"><Num value={o.pitch} min={100} onChange={v => onChange({ pitch: v })} /></Field>
+        <Field label="Spessore lamiera"><Num value={o.thickness} min={0.1} step={0.1} onChange={v => onChange({ thickness: v })} /></Field>
+        <LineLength o={o} onChange={onChange} label="Lunghezza (mm)" />
+        <button type="button" className="btn-secondary full-width" onClick={() => onChange({ flip: !o.flip })}>
+          Inverti lato della linea
+        </button>
+        <label className="check-label full-width">
+          <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
       </div>
     </>
   )
@@ -938,6 +1073,8 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
+      {o.type === 'envelope' && <EnvelopeProps o={o} onChange={onChange} />}
+      {o.type === 'seam' && <SeamProps o={o} onChange={onChange} />}
 
       {o.type === 'image' && o.clipPoints && (
         <div className="prop-grid">
@@ -979,7 +1116,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {canRotate && (
           <Field label="Rotazione (°)"><Num value={o.rotation || 0} onChange={v => onChange({ rotation: v })} /></Field>
         )}
-        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable' || o.type === 'deck') && (
+        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable' || o.type === 'deck' || o.type === 'envelope' || o.type === 'seam') && (
           <Field label="Spessore linea"><Num value={o.strokeWidth ?? 2} min={0.25} step={0.5} onChange={v => onChange({ strokeWidth: v })} /></Field>
         )}
       </div>

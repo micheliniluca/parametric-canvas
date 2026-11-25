@@ -5,6 +5,7 @@ import type { Point } from '../types'
 import { round1 } from '../utils/mathUtils'
 import { ttfSocket } from '../utils/cableUtils'
 import { weldLabel } from '../utils/weldUtils'
+import { envelopeLabel, seamLabel } from '../utils/envelopeUtils'
 import { textLeader } from '../utils/leaderUtils'
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br'
@@ -65,6 +66,8 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   else if (o.type === 'bolt') parts.push(`M${o.diameter}${o.cols * (o.view === 'section' ? 1 : o.rows) > 1 ? ` · ${o.cols}×${o.view === 'section' ? 1 : o.rows}` : ''}`)
   else if (o.type === 'deck') parts.push(`${o.view === 'side' ? 'L' : 'B'} ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'weld') parts.push(weldLabel(o))
+  else if (o.type === 'envelope') parts.push(`${envelopeLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
+  else if (o.type === 'seam') parts.push(`${seamLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)

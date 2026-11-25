@@ -1,15 +1,17 @@
-import type { ArrowObject, CableObject, CanvasObject, DeckObject, Point, QuoteObject, WeldObject } from '../types'
+import type { ArrowObject, CableObject, CanvasObject, DeckObject, EnvelopeObject, Point, QuoteObject, SeamObject, WeldObject } from '../types'
 import { findProfile } from '../profiles'
 import { getBeamPoints } from '../beamPath'
 import { boltBounds, boltCenters } from '../utils/boltUtils'
 import { cableBounds } from '../utils/cableUtils'
 import { deckBounds } from '../utils/deckUtils'
 import { weldBounds } from '../utils/weldUtils'
+import { envelopeBounds, seamBounds } from '../utils/envelopeUtils'
 
 /** Oggetti definiti da due estremità (x1, y1) – (x2, y2) */
-export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject
+export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject
 export const isEndpoint = (o: CanvasObject): o is EndpointObject =>
-  o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck' || o.type === 'weld'
+  o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck' || o.type === 'weld' ||
+  o.type === 'envelope' || o.type === 'seam'
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -74,6 +76,10 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return deckBounds(o)
     case 'weld':
       return weldBounds(o)
+    case 'envelope':
+      return envelopeBounds(o)
+    case 'seam':
+      return seamBounds(o)
     case 'profile': {
       const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
@@ -105,6 +111,8 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     case 'cable':
     case 'deck':
     case 'weld':
+    case 'envelope':
+    case 'seam':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
     case 'text':
       return { ...o, x: o.x + dx, y: o.y + dy, leader: o.leader && mv(o.leader) }
@@ -199,7 +207,9 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
     case 'quote':
     case 'cable':
     case 'deck':
-    case 'weld': {
+    case 'weld':
+    case 'envelope':
+    case 'seam': {
       const p1 = sp({ x: obj.x1, y: obj.y1 })
       const p2 = sp({ x: obj.x2, y: obj.y2 })
       return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }

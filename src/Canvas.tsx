@@ -20,6 +20,7 @@ import { findProfile } from './profiles'
 import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
 import { DEFAULT_DECK, deckProfile } from './utils/deckUtils'
 import { defaultBeadRot } from './utils/weldUtils'
+import { ENVELOPE_KINDS } from './utils/envelopeUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -237,6 +238,31 @@ export function Canvas({
       studs: prev?.studs ?? false, studD: prev?.studD ?? 19, studH: prev?.studH ?? deckProfile(prev?.profile ?? DEFAULT_DECK).studH,
       studsPerTrough: prev?.studsPerTrough ?? 1, beamSpacing: prev?.beamSpacing ?? 0,
       stroke: drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: '#e2e8f0',
+    }
+  }
+
+  // involucro e copertura riprendono le impostazioni dell'ultimo elemento dello stesso tipo
+  const makeEnvelope = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'envelope')
+    const prev = last?.type === 'envelope' ? last : null
+    const kind = prev?.kind ?? 'insulation'
+    return {
+      id: crypto.randomUUID(), type: 'envelope', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      kind, thickness: prev?.thickness ?? 100, ribs: prev?.ribs ?? 'flat', ribHeight: prev?.ribHeight ?? 40,
+      ribPitch: prev?.ribPitch ?? 250, skin: prev?.skin ?? 0.5, module: prev?.module ?? 1000,
+      glazing: prev?.glazing ?? '6/16/6', showLabel: false,
+      stroke: drawStyle.stroke, strokeWidth: 1, fillEnabled: true,
+      fillColor: prev?.fillColor ?? ENVELOPE_KINDS.find(k => k.id === kind)!.fill,
+    }
+  }
+
+  const makeSeam = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'seam')
+    const prev = last?.type === 'seam' ? last : null
+    return {
+      id: crypto.randomUUID(), type: 'seam', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      seam: prev?.seam ?? 'double', height: prev?.height ?? 25, pitch: prev?.pitch ?? 500,
+      thickness: prev?.thickness ?? 0.7, showLabel: false, stroke: drawStyle.stroke, strokeWidth: 1.5,
     }
   }
 
@@ -478,6 +504,8 @@ export function Canvas({
       case 'quote':
       case 'cable':
       case 'deck':
+      case 'envelope':
+      case 'seam':
       case 'weld':
       case 'measure':
       case 'scale': {
@@ -573,6 +601,10 @@ export function Canvas({
       addObject(makeDeck(s.p1, s.p2))
     } else if (tool === 'weld') {
       addObject(makeWeld(s.p1, s.p2))
+    } else if (tool === 'envelope') {
+      addObject(makeEnvelope(s.p1, s.p2))
+    } else if (tool === 'seam') {
+      addObject(makeSeam(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -638,7 +670,7 @@ export function Canvas({
     if (!a) {
       if (segment && tool === 'rect') {
         setSegment({ ...segment, p2: rectCorner(e, segment.p1) })
-      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
+      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -1002,6 +1034,12 @@ export function Canvas({
             {segment && tool === 'deck' && dist(segment.p1, segment.p2) > 0 && (
               <g opacity={0.55} pointerEvents="none">
                 <ObjectView o={makeDeck(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
+            {segment && (tool === 'envelope' || tool === 'seam') && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={tool === 'envelope' ? makeEnvelope(segment.p1, segment.p2) : makeSeam(segment.p1, segment.p2)}
+                  interactive={false} onMouseDown={() => {}} />
               </g>
             )}
             {segment && tool === 'weld' && dist(segment.p1, segment.p2) > 0 && (

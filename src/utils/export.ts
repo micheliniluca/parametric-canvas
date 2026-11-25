@@ -4,6 +4,7 @@ import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
+import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from './envelopeUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
 import { quoteTerminals } from './quoteUtils'
@@ -17,7 +18,7 @@ import { pathToPolylines } from './pathToPolylines'
  * Le immagini e i riempimenti non vengono esportati, tranne le campiture piene delle saldature (SOLID).
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'NASCOSTE' | 'ASSI'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -31,6 +32,7 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'CALCESTRUZZO', color: 8, ltype: 'CONTINUOUS' },
   { name: 'PIOLI', color: 2, ltype: 'CONTINUOUS' },
   { name: 'SALDATURE', color: 30, ltype: 'CONTINUOUS' },
+  { name: 'INVOLUCRO', color: 150, ltype: 'CONTINUOUS' },
   { name: 'NASCOSTE', color: 8, ltype: 'DASHED' },
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
 ]
@@ -297,6 +299,21 @@ function entitiesOf(o: CanvasObject): Ent[] {
         const w = t.text.length * 0.6 * dr.fontSize
         const x = t.anchor === 'end' ? t.x - w : t.anchor === 'middle' ? t.x - w / 2 : t.x
         text('SALDATURE', { x, y: t.y }, dr.fontSize, t.text, 0, 'left', 'middle')
+      }
+      break
+    }
+
+    case 'envelope':
+    case 'seam': {
+      const dr = o.type === 'envelope' ? envelopeDrawing(o) : seamDrawing(o)
+      path('INVOLUCRO', dr.fill)
+      path('INVOLUCRO', dr.lines)
+      path('INVOLUCRO', dr.thin)
+      for (const pl of pathToPolylines(dr.solid)) { poly('INVOLUCRO', pl.pts, true); fill('INVOLUCRO', pl.pts) }
+      if (o.showLabel) {
+        const above = o.type === 'envelope' ? envelopeThickness(o) + (o.kind === 'sandwich' && o.ribs === 'roof' ? o.ribHeight ?? 40 : 0) : o.height
+        const lp = labelPlacement(dr, above)
+        text('INVOLUCRO', lp.pos, lp.fontSize, o.type === 'envelope' ? envelopeLabel(o) : seamLabel(o), lp.angle, 'center', 'middle')
       }
       break
     }

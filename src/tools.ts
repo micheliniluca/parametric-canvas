@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { IconBolt, IconCable, IconDeck, IconDimension, IconIPE, IconWeld } from './icons'
+import { IconBolt, IconCable, IconDeck, IconDimension, IconEnvelope, IconIPE, IconSeam, IconWeld } from './icons'
 import {
   MousePointer2,
   Minus,
@@ -35,6 +35,8 @@ export type ToolId =
   | 'cable'
   | 'deck'
   | 'weld'
+  | 'envelope'
+  | 'seam'
   | 'quote'
   | 'measure'
   | 'scale'
@@ -69,6 +71,8 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
   cable: { id: 'cable', label: 'Cavo FLC con forcelle', icon: IconCable, shortcut: 'F', hint: 'Clic sul primo perno (estremità A), clic sul secondo (B). Ctrl = snap. Taglia e forcelle nel pannello' },
   deck: { id: 'deck', label: 'Lamiera grecata', icon: IconDeck, shortcut: 'H', hint: 'Clic sul punto iniziale e sul punto finale dell\'appoggio: la linea è la larghezza della lamiera. Profilo, vista e getto nel pannello' },
+  envelope: { id: 'envelope', label: 'Involucro: isolante, pannello sandwich, vetro', icon: IconEnvelope, shortcut: 'E', hint: 'Clic sul punto iniziale e sul punto finale della faccia d\'appoggio. Tipo, spessore e composizione nel pannello' },
+  seam: { id: 'seam', label: 'Copertura aggraffata (standing seam)', icon: IconSeam, shortcut: 'U', hint: 'Clic sul punto iniziale e sul punto finale del piano di posa. Aggraffatura, altezza e passo nel pannello' },
   weld: { id: 'weld', label: 'Saldatura', icon: IconWeld, shortcut: 'W', hint: 'Clic sul giunto (punta della freccia), poi dove va la linea di riferimento. Norma, tipo, quote e cordone nel pannello' },
   quote: { id: 'quote', label: 'Quota', icon: IconDimension, shortcut: 'Q', hint: 'Clic sul primo punto, clic sul secondo' },
   measure: { id: 'measure', label: 'Misura', icon: Ruler, shortcut: 'M', hint: 'Clic su due punti per misurare la distanza' },
@@ -80,5 +84,5 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 /** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
-  t === 'bolt' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'bolt' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'envelope' || t === 'seam' || t === 'quote' || t === 'measure' || t === 'scale' ||
   t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

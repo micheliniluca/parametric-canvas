@@ -105,6 +105,7 @@ export function Toolbar(p: Props) {
         <Sep />
         {toolBtn('profile')}
         {toolBtn('bolt')}
+        {toolBtn('screw')}
         {toolBtn('cable')}
         {toolBtn('deck')}
         {toolBtn('envelope')}

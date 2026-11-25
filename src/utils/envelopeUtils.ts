@@ -34,6 +34,10 @@ export type EnvelopeDrawing = {
   thin: string
   /** aree piene nel colore del tratto (distanziatori, teste delle aggraffature) */
   solid: string
+  /** strati con un colore proprio (parete Aquapanel), sotto alle altre linee */
+  layers?: { d: string; color: string }[]
+  /** linee tratteggiate (rete di armatura, telo) */
+  dashed?: string
   hull: Point[]
   frame: Frame
 }
@@ -44,13 +48,13 @@ export type EnvelopeDrawing = {
  * Retino dell'isolante morbido a spirale: archi in alto e in basso uniti da tratti obliqui che si incrociano.
  * Passo = metà spessore, raggio degli archi = un quarto dello spessore.
  */
-const coil = (P: (x: number, y: number) => Point, L: number, t: number, steps = 6): string => {
+const coil = (P: (x: number, y: number) => Point, L: number, t: number, x0 = 0, y0 = 0, steps = 6): string => {
   const p = t / 2, r = t / 4
   const arc = (cx: number, cy: number, top: boolean) => {
     const pts: Point[] = []
     for (let i = 0; i <= steps; i++) {
       const a = Math.PI - (Math.PI * i) / steps
-      pts.push(P(cx + r * Math.cos(a), cy + (top ? 1 : -1) * r * Math.sin(a)))
+      pts.push(P(x0 + cx + r * Math.cos(a), y0 + cy + (top ? 1 : -1) * r * Math.sin(a)))
     }
     return pts
   }
@@ -60,6 +64,76 @@ const coil = (P: (x: number, y: number) => Point, L: number, t: number, steps = 
     if ((k + 0.5) * p + r <= L + 1e-6) pts.push(...arc((k + 0.5) * p, r, false))
   }
   return polyD(pts)
+}
+
+/* ---------- parete Aquapanel Outdoor ---------- */
+
+/** Spessori del sistema Knauf Aquapanel Outdoor (manuale 10/2012) */
+export const AQ = {
+  board: 12.5,
+  /** lastra interna in gesso rivestito */
+  inner: 12.5,
+  /** ali dei montanti C 50/xx/50 e risvolti */
+  flange: 50,
+  lip: 6,
+  studs: [50, 75, 100, 150],
+}
+
+export const aquapanelLayers = (o: EnvelopeObject) => {
+  const r = o.aqRender ?? 5
+  const frames = o.aqFrames ?? 1
+  const d1 = o.aqStud ?? 75
+  const d2 = frames === 2 ? o.aqInnerStud ?? 50 : 0
+  const gap = frames === 2 ? o.aqGap ?? 10 : 0
+  const nb = Math.max(0, Math.round(o.aqBoards ?? 1))
+  return { r, frames, d1, d2, gap, nb, total: r + AQ.board + d1 + gap + d2 + nb * AQ.inner }
+}
+
+/** Sezione orizzontale della parete Aquapanel: strati, montanti C a interasse, isolante tra i montanti */
+function aquapanelDrawing(o: EnvelopeObject, P: (x: number, y: number) => Point, L: number) {
+  const { r, frames, d1, d2, gap, nb } = aquapanelLayers(o)
+  const rect = (y0: number, y1: number) => polyD([P(0, y0), P(L, y0), P(L, y1), P(0, y1)], true)
+  const layers: { d: string; color: string }[] = []
+  let lines = '', thin = '', dashed = ''
+  // rasatura (Exterior Basecoat con rete) e lastra Aquapanel Outdoor
+  layers.push({ d: rect(0, r), color: '#f5f5f4' })
+  dashed += polyD([P(0, r * 0.55), P(L, r * 0.55)])
+  let y = r
+  layers.push({ d: rect(y, y + AQ.board), color: '#d6d3d1' })
+  y += AQ.board
+  // Tyvek StuccoWrap sul retro della lastra
+  dashed += polyD([P(0, y + 0.8), P(L, y + 0.8)])
+  const spacing = Math.max(100, o.aqSpacing ?? 600)
+  const frame = (y0: number, d: number) => {
+    const xs: number[] = []
+    for (let x = 0; x + AQ.flange <= L + 1e-6; x += spacing) xs.push(x)
+    for (const x of xs) {
+      // montante C: anima perpendicolare alla parete, ali lungo le facce, piccoli risvolti
+      lines += polyD([
+        P(x + AQ.flange, y0 + AQ.lip), P(x + AQ.flange, y0), P(x, y0),
+        P(x, y0 + d), P(x + AQ.flange, y0 + d), P(x + AQ.flange, y0 + d - AQ.lip),
+      ])
+    }
+    if (o.aqInsulation !== false) {
+      const bays = [...xs, L]
+      for (let i = 0; i < bays.length - 1; i++) {
+        if (bays[i + 1] - bays[i] > d / 2) thin += coil(P, bays[i + 1] - bays[i], d, bays[i], y0)
+      }
+    }
+  }
+  frame(y, d1)
+  y += d1
+  if (frames === 2) {
+    y += gap
+    frame(y, d2)
+    y += d2
+  }
+  // lastre interne in gesso rivestito
+  for (let i = 0; i < nb; i++) {
+    layers.push({ d: rect(y, y + AQ.inner), color: '#f8fafc' })
+    y += AQ.inner
+  }
+  return { layers, lines, thin, dashed, top: y }
 }
 
 /* ---------- vetro ---------- */
@@ -94,16 +168,18 @@ export const ENVELOPE_KINDS: { id: EnvelopeObject['kind']; label: string; fill: 
   { id: 'insulation', label: 'Isolante', fill: '#fef9c3' },
   { id: 'sandwich', label: 'Pannello sandwich', fill: '#fef9c3' },
   { id: 'glass', label: 'Vetro', fill: '#dbeafe' },
+  { id: 'aquapanel', label: 'Aquapanel Outdoor', fill: '#d6d3d1' },
 ]
 
 export const envelopeThickness = (o: EnvelopeObject) =>
-  o.kind === 'glass' ? glazingThickness(o.glazing ?? '6/16/6') : o.thickness
+  o.kind === 'glass' ? glazingThickness(o.glazing ?? '6/16/6') : o.kind === 'aquapanel' ? aquapanelLayers(o).total : o.thickness
 
 export function envelopeDrawing(o: EnvelopeObject): EnvelopeDrawing {
   const f = frameOf(o)
   const P = (x: number, y: number) => at(f, x, y)
   const L = f.L
-  let fill = '', lines = '', thin = '', solid = ''
+  let fill = '', lines = '', thin = '', solid = '', dashed = ''
+  let layers: { d: string; color: string }[] = []
   let top = envelopeThickness(o)
 
   if (o.kind === 'insulation') {
@@ -134,6 +210,10 @@ export function envelopeDrawing(o: EnvelopeObject): EnvelopeDrawing {
     // giunti tra i pannelli (larghezza utile)
     const module = o.module ?? 1000
     if (module > 0) for (let x = module; x < L - 1; x += module) thin += polyD([P(x, 0), P(x, t)])
+  } else if (o.kind === 'aquapanel') {
+    const aq = aquapanelDrawing(o, P, L)
+    ;({ layers, lines, thin, dashed } = aq)
+    top = aq.top
   } else {
     // vetrata: lastre, intercalari, intercapedini con distanziatore alle estremità
     let y = 0
@@ -149,7 +229,7 @@ export function envelopeDrawing(o: EnvelopeObject): EnvelopeDrawing {
     }
   }
 
-  return { fill, lines, thin, solid, hull: [P(0, 0), P(L, 0), P(L, top), P(0, top)], frame: f }
+  return { fill, lines, thin, solid, layers, dashed, hull: [P(0, 0), P(L, 0), P(L, top), P(0, top)], frame: f }
 }
 
 /* ---------- standing seam ---------- */
@@ -211,6 +291,11 @@ export function seamDrawing(o: SeamObject): EnvelopeDrawing {
 
 export const envelopeLabel = (o: EnvelopeObject): string => {
   if (o.kind === 'glass') return `Vetro ${o.glazing ?? '6/16/6'} (${+glazingThickness(o.glazing ?? '6/16/6').toFixed(2)} mm)`
+  if (o.kind === 'aquapanel') {
+    const a = aquapanelLayers(o)
+    const studs = a.frames === 2 ? `C${a.d1} + C${a.d2}` : `C${a.d1}`
+    return `Aquapanel Outdoor · ${studs} i${o.aqSpacing ?? 600} · ${a.nb ? `${a.nb}×12,5 int.` : 'senza lastre int.'} · ${+a.total.toFixed(1)} mm`
+  }
   if (o.kind === 'sandwich') return `Pannello sandwich ${o.thickness}${o.ribs === 'roof' ? ' copertura' : ''}`
   return `Isolante ${o.thickness}`
 }

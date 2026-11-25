@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, SeamObject, WeldObject } from './types'
+import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, ScrewObject, SeamObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { MaffeisLogo } from './components/MaffeisLogo'
@@ -18,7 +18,8 @@ import {
 import {
   WELD_KINDS, WELD_PROCESSES, defaultBeadRot, filletLeg, filletThroat, isButt, weldLabel,
 } from './utils/weldUtils'
-import { ENVELOPE_KINDS, SEAM_TYPES, envelopeLabel, envelopeThickness, seamLabel } from './utils/envelopeUtils'
+import { HEAD_LABEL, POINT_LABEL, SCREW_TYPES, defaultScrew, screwDims, screwLabel, screwType } from './utils/screwUtils'
+import { AQ, ENVELOPE_KINDS, SEAM_TYPES, envelopeLabel, envelopeThickness, seamLabel } from './utils/envelopeUtils'
 import { defaultLeaderTip, leaderWidth } from './utils/leaderUtils'
 import { downloadText } from './utils/project'
 import { styleCaps } from './style'
@@ -60,7 +61,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
   symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
-  envelope: 'Involucro', seam: 'Copertura aggraffata',
+  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -503,7 +504,7 @@ function EnvelopeProps({ o, onChange }: { o: EnvelopeObject; onChange: (patch: P
             ))}
           </div>
         </Field>
-        {!glass && (
+        {!glass && o.kind !== 'aquapanel' && (
           <Field label="Spessore (mm)"><Num value={o.thickness} min={1} onChange={v => onChange({ thickness: v })} /></Field>
         )}
         {glass && (
@@ -523,6 +524,51 @@ function EnvelopeProps({ o, onChange }: { o: EnvelopeObject; onChange: (patch: P
           </p>
         )}
       </div>
+
+      {o.kind === 'aquapanel' && (
+        <>
+          <h4>Parete Aquapanel Outdoor</h4>
+          <div className="prop-grid">
+            <p className="muted full-width" style={{ margin: 0 }}>
+              Dall'esterno: rasatura con rete, lastra Aquapanel 12,5, Tyvek StuccoWrap, montanti C MgZ con isolante,
+              lastre interne 12,5. Viti Maxi Screw HS (profili fino a 0,7) o TEKS (0,8–2 mm) a interasse ≤ 200 mm.
+            </p>
+            <Field label="Montanti esterni">
+              <select value={o.aqStud ?? 75} onChange={e => onChange({ aqStud: +e.target.value })}>
+                {AQ.studs.map(d => <option key={d} value={d}>C 50/{d}/50</option>)}
+              </select>
+            </Field>
+            <Field label="Interasse (≤ 600)"><Num value={o.aqSpacing ?? 600} min={100} onChange={v => onChange({ aqSpacing: v })} /></Field>
+            <Field label="Orditura" full>
+              <div className="segmented">
+                {([[1, 'Singola'], [2, 'Doppia']] as const).map(([v, l]) => (
+                  <button key={v} type="button" className={(o.aqFrames ?? 1) === v ? 'active' : ''} onClick={() => onChange({ aqFrames: v })}>{l}</button>
+                ))}
+              </div>
+            </Field>
+            {(o.aqFrames ?? 1) === 2 && (
+              <>
+                <Field label="Montanti interni">
+                  <select value={o.aqInnerStud ?? 50} onChange={e => onChange({ aqInnerStud: +e.target.value })}>
+                    {AQ.studs.map(d => <option key={d} value={d}>C 50/{d}/50</option>)}
+                  </select>
+                </Field>
+                <Field label="Distacco (mm)"><Num value={o.aqGap ?? 10} min={0} onChange={v => onChange({ aqGap: v })} /></Field>
+              </>
+            )}
+            <Field label="Lastre interne">
+              <select value={o.aqBoards ?? 1} onChange={e => onChange({ aqBoards: +e.target.value })}>
+                {[0, 1, 2].map(n => <option key={n} value={n}>{n === 0 ? 'Nessuna' : `${n} × 12,5`}</option>)}
+              </select>
+            </Field>
+            <Field label="Rasatura (mm)"><Num value={o.aqRender ?? 5} min={1} onChange={v => onChange({ aqRender: v })} /></Field>
+            <label className="check-label full-width">
+              <input type="checkbox" checked={o.aqInsulation !== false} onChange={e => onChange({ aqInsulation: e.target.checked })} />
+              Isolante tra i montanti
+            </label>
+          </div>
+        </>
+      )}
 
       {o.kind === 'sandwich' && (
         <>
@@ -589,6 +635,105 @@ function SeamProps({ o, onChange }: { o: SeamObject; onChange: (patch: Partial<C
         <button type="button" className="btn-secondary full-width" onClick={() => onChange({ flip: !o.flip })}>
           Inverti lato della linea
         </button>
+        <label className="check-label full-width">
+          <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
+function ScrewProps({ o, onChange }: { o: ScrewObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const t = screwType(o.kind)
+  const D = screwDims(o)
+  const hexHead = o.head === 'hexWasher' || o.head === 'hex'
+  const sheet = o.kind === 'drill' || o.kind === 'tapping'
+  const partial = o.kind === 'wood' || o.kind === 'lag'
+  const nf = (v: number) => String(round1(v)).replace('.', ',')
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{screwLabel(o)}</div>
+        <div className="muted">
+          Per {t.use} · testa {nf(D.head.dk)}{D.head.dc ? ` (flangia ${nf(D.head.dc)})` : ''} × {nf(D.head.k)} · passo {nf(D.p)} · nucleo {nf(D.core)} mm
+        </div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Tipo" full>
+          <select value={o.kind} onChange={e => onChange(defaultScrew(e.target.value as ScrewObject['kind']))}>
+            {SCREW_TYPES.map(s => <option key={s.id} value={s.id}>{s.label} ({s.use})</option>)}
+          </select>
+        </Field>
+        <Field label="Vista" full>
+          <div className="segmented">
+            {([['side', 'Laterale'], ['head', 'Dalla testa']] as const).map(([v, l]) => (
+              <button key={v} type="button" className={o.view === v ? 'active' : ''} onClick={() => onChange({ view: v })}>{l}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Diametro">
+          <select value={o.diameter} onChange={e => onChange({ diameter: +e.target.value })}>
+            {t.diameters.map(d => <option key={d} value={d}>{sheet ? `ST${nf(d)}` : `Ø ${nf(d)}`}</option>)}
+          </select>
+        </Field>
+        <Field label="Lunghezza">
+          <input list={`screw-lengths-${o.kind}`} value={o.length} onChange={e => {
+            const v = parseFloat(e.target.value.replace(',', '.'))
+            if (v > 0) onChange({ length: v })
+          }} />
+          <datalist id={`screw-lengths-${o.kind}`}>{t.lengths.map(l => <option key={l} value={l} />)}</datalist>
+        </Field>
+        <Field label="Testa">
+          <select value={o.head} onChange={e => onChange({ head: e.target.value as ScrewObject['head'] })}>
+            {t.heads.map(h => <option key={h} value={h}>{HEAD_LABEL[h]}{t.std[h] ? ` · ${t.std[h]}` : ''}</option>)}
+          </select>
+        </Field>
+        <Field label="Punta">
+          <select value={o.point} onChange={e => onChange({ point: e.target.value as ScrewObject['point'] })}>
+            {t.points.map(p => <option key={p} value={p}>{POINT_LABEL[p]}</option>)}
+          </select>
+        </Field>
+        {!hexHead && (
+          <Field label="Impronta">
+            <select value={o.drive} onChange={e => onChange({ drive: e.target.value as ScrewObject['drive'] })}>
+              <option value="PH">Croce (PH)</option>
+              <option value="TX">Torx (TX)</option>
+              <option value="none">—</option>
+            </select>
+          </Field>
+        )}
+        {partial && (
+          <>
+            <label className="check-label">
+              <input type="checkbox" checked={!!o.fullThread} onChange={e => onChange({ fullThread: e.target.checked })} />
+              Filetto totale
+            </label>
+            {!o.fullThread && (
+              <Field label="Lungh. filetto"><Num value={D.thread} min={1} onChange={v => onChange({ threadLength: v })} /></Field>
+            )}
+          </>
+        )}
+        {sheet && hexHead && (
+          <>
+            <label className="check-label">
+              <input type="checkbox" checked={!!o.washer} onChange={e => onChange({ washer: e.target.checked })} />
+              Rondella EPDM
+            </label>
+            {o.washer && (
+              <Field label="Ø rondella">
+                <select value={o.washerD ?? 16} onChange={e => onChange({ washerD: +e.target.value })}>
+                  {[14, 16, 19, 22].map(d => <option key={d} value={d}>Ø {d}</option>)}
+                </select>
+              </Field>
+            )}
+          </>
+        )}
+        {o.kind === 'aquapanel' && (
+          <p className="muted full-width" style={{ margin: 0 }}>
+            Maxi Screw HS per profili fino a 0,7 mm, TEKS da 0,8 a 2 mm; interasse ≤ 200 mm. Misure indicative.
+          </p>
+        )}
         <label className="check-label full-width">
           <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
           Mostra designazione sul disegno
@@ -1073,6 +1218,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
+      {o.type === 'screw' && <ScrewProps o={o} onChange={onChange} />}
       {o.type === 'envelope' && <EnvelopeProps o={o} onChange={onChange} />}
       {o.type === 'seam' && <SeamProps o={o} onChange={onChange} />}
 
@@ -1116,7 +1262,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
         {canRotate && (
           <Field label="Rotazione (°)"><Num value={o.rotation || 0} onChange={v => onChange({ rotation: v })} /></Field>
         )}
-        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable' || o.type === 'deck' || o.type === 'envelope' || o.type === 'seam') && (
+        {(o.type === 'rect' || o.type === 'circle' || o.type === 'polyline' || o.type === 'arrow' || o.type === 'profile' || o.type === 'cable' || o.type === 'deck' || o.type === 'envelope' || o.type === 'seam' || o.type === 'screw') && (
           <Field label="Spessore linea"><Num value={o.strokeWidth ?? 2} min={0.25} step={0.5} onChange={v => onChange({ strokeWidth: v })} /></Field>
         )}
       </div>

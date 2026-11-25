@@ -4,6 +4,7 @@ import { generateBeamPath } from '../beamPath'
 import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
+import { screwDrawing, screwLabel } from './screwUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from './envelopeUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
@@ -242,6 +243,15 @@ function entitiesOf(o: CanvasObject): Ent[] {
       break
     }
 
+    case 'screw': {
+      const dr = screwDrawing(o)
+      path('BULLONI', dr.outline)
+      path('BULLONI', dr.thin)
+      path('ASSI', dr.axis)
+      if (o.showLabel) text('BULLONI', { x: dr.bounds.x + dr.bounds.w + 4, y: dr.bounds.y + 4 }, 10, screwLabel(o), 0, 'left', 'baseline')
+      break
+    }
+
     case 'profile': {
       const profile = findProfile(o.profileName)
       if (!profile) break
@@ -306,7 +316,9 @@ function entitiesOf(o: CanvasObject): Ent[] {
     case 'envelope':
     case 'seam': {
       const dr = o.type === 'envelope' ? envelopeDrawing(o) : seamDrawing(o)
+      for (const l of dr.layers ?? []) path('INVOLUCRO', l.d)
       path('INVOLUCRO', dr.fill)
+      path('NASCOSTE', dr.dashed)
       path('INVOLUCRO', dr.lines)
       path('INVOLUCRO', dr.thin)
       for (const pl of pathToPolylines(dr.solid)) { poly('INVOLUCRO', pl.pts, true); fill('INVOLUCRO', pl.pts) }

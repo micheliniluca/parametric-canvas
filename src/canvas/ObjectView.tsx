@@ -6,6 +6,7 @@ import { boltBounds, boltCenters, boltDrawing, boltLabel } from '../utils/boltUt
 import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
 import { weldDrawing } from '../utils/weldUtils'
+import { screwDrawing, screwLabel } from '../utils/screwUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from '../utils/envelopeUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
@@ -251,6 +252,27 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       )
     }
 
+    case 'screw': {
+      const sw = o.strokeWidth ?? 0.35
+      const dr = screwDrawing(o)
+      const b = dr.bounds
+      return (
+        <g transform={transform} onPointerDown={down} pointerEvents={pe}>
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
+          <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.35}
+            strokeDasharray={`${sw * 6} ${sw * 1.5} ${sw * 1} ${sw * 1.5}`} pointerEvents="none" />
+          <path d={dr.outline} fill={o.fillEnabled ? o.fillColor || 'white' : 'none'} fillOpacity={fo}
+            stroke={stroke} strokeWidth={sw} strokeLinejoin="round" pointerEvents="none" />
+          <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.5} pointerEvents="none" />
+          {o.showLabel && (
+            <text x={b.x + b.w + 4} y={b.y + 4} fontSize={10} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+              {screwLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
     case 'cable': {
       const sw = o.strokeWidth ?? 1.5
       const dr = cableDrawing(o)
@@ -351,9 +373,17 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           {/* area di presa lungo la linea d'appoggio */}
           <line x1={o.x1} y1={o.y1} x2={o.x2} y2={o.y2} stroke="transparent" strokeWidth={14}
             vectorEffect="non-scaling-stroke" pointerEvents={interactive ? 'stroke' : 'none'} />
+          {dr.layers?.map((l, i) => (
+            <path key={i} d={l.d} fill={o.fillEnabled ? l.color : 'none'} fillOpacity={fo} stroke={stroke} strokeWidth={sw * 0.75}
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
+          ))}
           {dr.fill && (
             <path d={dr.fill} fill={fill} fillOpacity={fo} stroke={stroke} strokeWidth={sw}
               vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents={pe} />
+          )}
+          {dr.dashed && (
+            <path d={dr.dashed} fill="none" stroke={stroke} strokeWidth={sw * 0.5} strokeDasharray="4 2"
+              vectorEffect="non-scaling-stroke" pointerEvents="none" />
           )}
           {dr.thin && (
             <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.6} vectorEffect="non-scaling-stroke"

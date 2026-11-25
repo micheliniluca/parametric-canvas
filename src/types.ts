@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw'
   x: number
   y: number
   stroke?: string
@@ -242,7 +242,7 @@ export type EnvelopeObject = BaseObject & {
   y1: number
   x2: number
   y2: number
-  kind: 'insulation' | 'sandwich' | 'glass'
+  kind: 'insulation' | 'sandwich' | 'glass' | 'aquapanel'
   /** Spessore (isolante, pannello) in mm */
   thickness: number
   /** Dall'altra parte della linea */
@@ -256,6 +256,18 @@ export type EnvelopeObject = BaseObject & {
   module?: number
   /** Vetro: composizione, es. 6/16/6 o 33.1/16/6 */
   glazing?: string
+  /**
+   * Parete Knauf Aquapanel Outdoor, dall'esterno (lato linea): rasatura con rete, lastra 12,5,
+   * Tyvek StuccoWrap, montanti C MgZ con isolante, eventuale seconda orditura, lastre interne.
+   */
+  aqRender?: number
+  aqStud?: number
+  aqSpacing?: number
+  aqFrames?: 1 | 2
+  aqInnerStud?: number
+  aqGap?: number
+  aqBoards?: number
+  aqInsulation?: boolean
   showLabel?: boolean
 }
 
@@ -277,6 +289,29 @@ export type SeamObject = BaseObject & {
   showLabel?: boolean
 }
 
+/**
+ * Vite (acciaio, lamiera, legno, cartongesso, Aquapanel, calcestruzzo), in vista laterale o dalla testa.
+ * x, y = centro della superficie d'appoggio; la vite scende lungo +y (prima della rotazione).
+ */
+export type ScrewObject = BaseObject & {
+  type: 'screw'
+  kind: 'drill' | 'tapping' | 'wood' | 'lag' | 'plaster' | 'aquapanel' | 'concrete'
+  view: 'side' | 'head'
+  diameter: number
+  /** Lunghezza nominale (mm): sotto la testa, o totale per le teste a filo */
+  length: number
+  head: 'hexWasher' | 'hex' | 'pan' | 'countersunk' | 'bugle'
+  point: 'drill' | 'cone' | 'blunt' | 'gimlet' | 'needle'
+  drive: 'PH' | 'TX' | 'none'
+  /** Legno: filetto totale o lunghezza filettata */
+  fullThread?: boolean
+  threadLength?: number
+  /** Rondella con guarnizione EPDM (lamiere) */
+  washer?: boolean
+  washerD?: number
+  showLabel?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -288,4 +323,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject

@@ -6,6 +6,7 @@ import { cableBounds } from '../utils/cableUtils'
 import { deckBounds } from '../utils/deckUtils'
 import { weldBounds } from '../utils/weldUtils'
 import { envelopeBounds, seamBounds } from '../utils/envelopeUtils'
+import { screwBounds } from '../utils/screwUtils'
 
 /** Oggetti definiti da due estremità (x1, y1) – (x2, y2) */
 export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject
@@ -70,6 +71,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return fromPoints([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }])
     case 'bolt':
       return boltBounds(o)
+    case 'screw':
+      return screwBounds(o)
     case 'cable':
       return cableBounds(o)
     case 'deck':
@@ -219,6 +222,9 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
       return { ...obj, ...sp(obj), pitchX: obj.pitchX * sf, pitchY: obj.pitchY * sf }
     case 'symbol':
       return { ...obj, ...sp(obj), points: obj.points?.map(sp) }
+    case 'screw':
+      // misure normalizzate: si sposta solo la posizione
+      return { ...obj, ...sp(obj) }
   }
 }
 

@@ -41,6 +41,14 @@ export const IconDeck = ({ size }: Props) => (
   </Svg>
 )
 
+/** Vite autoperforante vista di lato */
+export const IconScrew = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 7.5 3 H 16.5 V 6 H 7.5 Z" strokeWidth={1.5} strokeLinejoin="round" />
+    <path d="M 10 6 L 14 7.5 L 10 9.5 L 14 11.5 L 10 13.5 L 14 15.5 L 10.6 17.3 L 12 21.5 L 13.4 17.3" strokeWidth={1.4} strokeLinejoin="round" />
+  </Svg>
+)
+
 /** Involucro: pannello con isolante a spirale */
 export const IconEnvelope = ({ size }: Props) => (
   <Svg size={size}>

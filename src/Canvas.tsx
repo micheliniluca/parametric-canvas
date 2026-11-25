@@ -21,6 +21,7 @@ import { DEFAULT_CABLE_SIZE } from './utils/cableUtils'
 import { DEFAULT_DECK, deckProfile } from './utils/deckUtils'
 import { defaultBeadRot } from './utils/weldUtils'
 import { ENVELOPE_KINDS } from './utils/envelopeUtils'
+import { defaultScrew } from './utils/screwUtils'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -251,6 +252,8 @@ export function Canvas({
       kind, thickness: prev?.thickness ?? 100, ribs: prev?.ribs ?? 'flat', ribHeight: prev?.ribHeight ?? 40,
       ribPitch: prev?.ribPitch ?? 250, skin: prev?.skin ?? 0.5, module: prev?.module ?? 1000,
       glazing: prev?.glazing ?? '6/16/6', showLabel: false,
+      aqRender: prev?.aqRender ?? 5, aqStud: prev?.aqStud ?? 75, aqSpacing: prev?.aqSpacing ?? 600, aqFrames: prev?.aqFrames ?? 1,
+      aqInnerStud: prev?.aqInnerStud ?? 50, aqGap: prev?.aqGap ?? 10, aqBoards: prev?.aqBoards ?? 1, aqInsulation: prev?.aqInsulation ?? true,
       stroke: drawStyle.stroke, strokeWidth: 1, fillEnabled: true,
       fillColor: prev?.fillColor ?? ENVELOPE_KINDS.find(k => k.id === kind)!.fill,
     }
@@ -502,6 +505,23 @@ export function Canvas({
         action.current = { kind: 'freehand' }
         return
       case 'quote':
+      case 'screw': {
+        // una nuova vite riprende tipo e misure dell'ultima
+        const p = pick(e)
+        const last = [...objects].reverse().find(o => o.type === 'screw')
+        const prev = last?.type === 'screw' ? last : null
+        addObject({
+          id: crypto.randomUUID(), type: 'screw', x: p.x, y: p.y,
+          ...(prev
+            ? { kind: prev.kind, diameter: prev.diameter, length: prev.length, head: prev.head, point: prev.point, drive: prev.drive,
+                fullThread: prev.fullThread, threadLength: prev.threadLength, washer: prev.washer, washerD: prev.washerD, rotation: prev.rotation }
+            : defaultScrew('drill')),
+          view: prev?.view ?? 'side', showLabel: false,
+          // le viti sono piccole: tratto sottile, altrimenti il filetto si impasta
+          stroke: drawStyle.stroke, strokeWidth: prev?.strokeWidth ?? 0.35, fillEnabled: true, fillColor: '#ffffff',
+        })
+        return
+      }
       case 'cable':
       case 'deck':
       case 'envelope':

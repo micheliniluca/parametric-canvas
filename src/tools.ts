@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { IconBolt, IconCable, IconDeck, IconDimension, IconEnvelope, IconIPE, IconScrew, IconSeam, IconWeld } from './icons'
+import { IconBolt, IconCable, IconDeck, IconDimension, IconEnvelope, IconIPE, IconPerson, IconScrew, IconSeam, IconWeld } from './icons'
 import {
   MousePointer2,
   Minus,
@@ -33,6 +33,7 @@ export type ToolId =
   | 'arrow'
   | 'bolt'
   | 'screw'
+  | 'person'
   | 'cable'
   | 'deck'
   | 'weld'
@@ -71,6 +72,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   arrow: { id: 'arrow', label: 'Freccia', icon: ArrowUpRight, shortcut: 'A', hint: 'Trascina dalla coda alla punta' },
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
   screw: { id: 'screw', label: 'Vite', icon: IconScrew, shortcut: 'J', hint: 'Clic dove la vite entra nel materiale (Ctrl = snap). Tipo, diametro, lunghezza, testa e punta nel pannello; ruota con la maniglia' },
+  person: { id: 'person', label: 'Persona (sagoma in scala)', icon: IconPerson, shortcut: 'Y', hint: 'Clic dove la persona poggia i piedi (Ctrl = snap). Figura e altezza nel pannello: operai, pubblico, tifosi, frontali o di profilo' },
   cable: { id: 'cable', label: 'Cavo FLC con forcelle', icon: IconCable, shortcut: 'F', hint: 'Clic sul primo perno (estremità A), clic sul secondo (B). Ctrl = snap. Taglia e forcelle nel pannello' },
   deck: { id: 'deck', label: 'Lamiera grecata', icon: IconDeck, shortcut: 'H', hint: 'Clic sul punto iniziale e sul punto finale dell\'appoggio: la linea è la larghezza della lamiera. Profilo, vista e getto nel pannello' },
   envelope: { id: 'envelope', label: 'Involucro: isolante, pannello sandwich, vetro', icon: IconEnvelope, shortcut: 'E', hint: 'Clic sul punto iniziale e sul punto finale della faccia d\'appoggio. Tipo, spessore e composizione nel pannello' },
@@ -86,5 +88,5 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 /** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
-  t === 'bolt' || t === 'screw' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'envelope' || t === 'seam' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'bolt' || t === 'screw' || t === 'person' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'envelope' || t === 'seam' || t === 'quote' || t === 'measure' || t === 'scale' ||
   t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

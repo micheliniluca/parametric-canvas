@@ -7,6 +7,7 @@ import { deckBounds } from '../utils/deckUtils'
 import { weldBounds } from '../utils/weldUtils'
 import { envelopeBounds, seamBounds } from '../utils/envelopeUtils'
 import { screwBounds } from '../utils/screwUtils'
+import { personBounds } from '../utils/peopleUtils'
 
 /** Oggetti definiti da due estremità (x1, y1) – (x2, y2) */
 export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject
@@ -73,6 +74,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return boltBounds(o)
     case 'screw':
       return screwBounds(o)
+    case 'person':
+      return personBounds(o)
     case 'cable':
       return cableBounds(o)
     case 'deck':
@@ -158,7 +161,7 @@ export const mirrorObject = (o: CanvasObject, ax: number): CanvasObject => {
   const c = getObjectCenter(o)
   const moved = translateObject(o, 2 * ax - 2 * c.x, 0)
   if (moved.type === 'text') return { ...moved, rotation: rot, leader: o.type === 'text' && o.leader ? mx(o.leader) : undefined }
-  if (moved.type === 'profile' || moved.type === 'image') return { ...moved, rotation: rot, flipX: !moved.flipX }
+  if (moved.type === 'profile' || moved.type === 'image' || moved.type === 'person') return { ...moved, rotation: rot, flipX: !moved.flipX }
   return { ...moved, rotation: rot }
 }
 
@@ -225,6 +228,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
     case 'screw':
       // misure normalizzate: si sposta solo la posizione
       return { ...obj, ...sp(obj) }
+    case 'person':
+      return { ...obj, ...sp(obj), height: obj.height * sf }
   }
 }
 

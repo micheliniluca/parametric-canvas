@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, ScrewObject, SeamObject, WeldObject } from './types'
+import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, PersonId, PersonObject, ScrewObject, SeamObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { MaffeisLogo } from './components/MaffeisLogo'
@@ -25,6 +25,7 @@ import { downloadText } from './utils/project'
 import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
 import { HATCHES, HATCH_GROUPS, hatchDef } from './utils/hatchUtils'
+import { PEOPLE, personDef } from './utils/peopleUtils'
 import { HatchPattern } from './canvas/HatchPattern'
 import {
   Ban, Database, Download, SlidersHorizontal, MousePointerClick,
@@ -63,7 +64,7 @@ export type PanelTab = 'props' | 'catalog' | 'export'
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
   symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
-  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite',
+  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite', person: 'Persona',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -785,6 +786,41 @@ function HatchProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partia
   )
 }
 
+function PersonProps({ o, onChange }: { o: PersonObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const def = personDef(o.person)
+  return (
+    <div className="prop-grid">
+      <Field label="Figura" full>
+        <select value={o.person} onChange={e => {
+          const next = personDef(e.target.value as PersonId)
+          // se l'altezza è ancora quella tipica della figura, prende quella della nuova (es. bambino 1,20 m)
+          const patch: Partial<PersonObject> = { person: next.id }
+          if (Math.abs(o.height - (def.stature ?? 1800)) < 1) patch.height = next.stature ?? 1800
+          onChange(patch)
+        }}>
+          {(['Operai', 'Pubblico', 'Tifosi'] as const).map(g => (
+            <optgroup key={g} label={g}>
+              {PEOPLE.filter(p => p.group === g).map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      </Field>
+      <Field label="Altezza (m)">
+        <Num value={o.height / 1000} min={0.3} step={0.05} onChange={v => onChange({ height: v * 1000 })} />
+      </Field>
+      <Field label="Verso">
+        <button type="button" className="btn-secondary" onClick={() => onChange({ flipX: !o.flipX })}>
+          {def.view === 'side' ? (o.flipX ? 'Guarda a sinistra' : 'Guarda a destra') : (o.flipX ? 'Specchiata' : 'Normale')}
+        </button>
+      </Field>
+      <label className="check-label full-width">
+        <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+        Mostra descrizione sul disegno
+      </label>
+    </div>
+  )
+}
+
 function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   const p = deckProfile(o.profile)
   const t = deckThickness(o)
@@ -1260,6 +1296,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
+      {o.type === 'person' && <PersonProps o={o} onChange={onChange} />}
       {o.type === 'screw' && <ScrewProps o={o} onChange={onChange} />}
       {o.type === 'envelope' && <EnvelopeProps o={o} onChange={onChange} />}
       {o.type === 'seam' && <SeamProps o={o} onChange={onChange} />}

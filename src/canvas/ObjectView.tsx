@@ -7,6 +7,7 @@ import { cableDrawing, cableLabel } from '../utils/cableUtils'
 import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacement } from '../utils/deckUtils'
 import { weldDrawing } from '../utils/weldUtils'
 import { screwDrawing, screwLabel } from '../utils/screwUtils'
+import { personBounds, personLabel, personPath } from '../utils/peopleUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from '../utils/envelopeUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
@@ -269,6 +270,21 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           {o.showLabel && (
             <text x={b.x + b.w + 6} y={b.y - 4} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
               {boltLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'person': {
+      const b = personBounds(o)
+      return (
+        <g transform={transform} onPointerDown={down} pointerEvents={pe}>
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
+          <path d={personPath(o)} fill={stroke} stroke="none" pointerEvents="none" />
+          {o.showLabel && (
+            <text x={b.x + b.w + 40} y={b.y + 120} fontSize={Math.max(10, o.height / 18)} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+              {personLabel(o)}
             </text>
           )}
         </g>

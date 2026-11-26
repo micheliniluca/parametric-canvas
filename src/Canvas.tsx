@@ -522,6 +522,18 @@ export function Canvas({
         })
         return
       }
+      case 'person': {
+        // una nuova persona riprende figura e altezza dell'ultima
+        const p = pick(e)
+        const last = [...objects].reverse().find(o => o.type === 'person')
+        const prev = last?.type === 'person' ? last : null
+        addObject({
+          id: crypto.randomUUID(), type: 'person', x: p.x, y: p.y,
+          person: prev?.person ?? 'workerStand', height: prev?.height ?? 1800, flipX: prev?.flipX,
+          rotation: prev?.rotation, showLabel: false, stroke: prev?.stroke ?? drawStyle.stroke,
+        })
+        return
+      }
       case 'cable':
       case 'deck':
       case 'envelope':

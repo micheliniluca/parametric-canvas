@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw' | 'person'
   x: number
   y: number
   stroke?: string
@@ -329,6 +329,22 @@ export type ScrewObject = BaseObject & {
   showLabel?: boolean
 }
 
+export type PersonId =
+  | 'workerStand' | 'workerShovel' | 'workerPoint' | 'workerLoad' | 'workerKneel' | 'workerWalkSide' | 'workerLadderSide'
+  | 'man' | 'woman' | 'manBag' | 'child' | 'elderCane' | 'wheelchair' | 'manWalkSide' | 'womanWalkSide' | 'stairsSide'
+  | 'fanArms' | 'fanScarf' | 'fanFlag' | 'fanSeated' | 'fanJumpSide'
+
+/** Sagoma di persona in scala. x, y = punto a terra al centro dei piedi */
+export type PersonObject = BaseObject & {
+  type: 'person'
+  person: PersonId
+  /** Statura in mm (in piedi, anche per le figure sedute o in ginocchio) */
+  height: number
+  /** Specchiata: le figure di profilo guardano a sinistra */
+  flipX?: boolean
+  showLabel?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -340,4 +356,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject | PersonObject

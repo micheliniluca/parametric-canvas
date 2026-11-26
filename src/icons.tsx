@@ -49,6 +49,14 @@ export const IconScrew = ({ size }: Props) => (
   </Svg>
 )
 
+/** Persona: sagoma in piedi */
+export const IconPerson = ({ size }: Props) => (
+  <Svg size={size}>
+    <circle cx="12" cy="4.2" r="2.1" strokeWidth={1.5} />
+    <path d="M 8 21 L 9.2 13.5 L 7.6 13 L 8.6 8 Q 12 7 15.4 8 L 16.4 13 L 14.8 13.5 L 16 21 M 12 14 V 21" strokeWidth={1.5} strokeLinejoin="round" />
+  </Svg>
+)
+
 /** Involucro: pannello con isolante a spirale */
 export const IconEnvelope = ({ size }: Props) => (
   <Svg size={size}>

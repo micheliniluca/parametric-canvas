@@ -5,6 +5,7 @@ import { boltBounds, boltCenters, boltDrawing, boltLabel } from './boltUtils'
 import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
 import { screwDrawing, screwLabel } from './screwUtils'
+import { personBounds, personLabel, personPolygons } from './peopleUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from './envelopeUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
@@ -21,7 +22,7 @@ import { hatchDef, hatchGeometry } from './hatchUtils'
  * I retini dei materiali vengono esplosi in linee e puntini sul layer RETINI.
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI' | 'RETINI'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI' | 'RETINI' | 'PERSONE'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -39,6 +40,7 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'NASCOSTE', color: 8, ltype: 'DASHED' },
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
   { name: 'RETINI', color: 9, ltype: 'CONTINUOUS' },
+  { name: 'PERSONE', color: 8, ltype: 'CONTINUOUS' },
 ]
 
 type Ent =
@@ -258,6 +260,16 @@ function entitiesOf(o: CanvasObject): Ent[] {
       if (o.showLabel) {
         const b = boltBounds(o)
         text('BULLONI', { x: b.x + b.w + 6, y: b.y - 4 }, 12, boltLabel(o), 0, 'left', 'baseline')
+      }
+      break
+    }
+
+    case 'person': {
+      // sagoma piena: campiture SOLID sovrapposte
+      for (const pl of personPolygons(o)) fill('PERSONE', pl)
+      if (o.showLabel) {
+        const b = personBounds(o)
+        text('PERSONE', { x: b.x + b.w + 40, y: b.y + 120 }, Math.max(10, o.height / 18), personLabel(o), 0, 'left', 'baseline')
       }
       break
     }

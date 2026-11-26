@@ -222,6 +222,12 @@ export type CableObject = BaseObject & {
   startSocket: boolean
   /** Forcella all'estremità B */
   endSocket: boolean
+  /** Sistema: cavo FLC con forcelle TTF (assente) o fune inox AISI 316 con forcelle / tenditore */
+  system?: 'flc' | 'inox'
+  /** Fune inox: tenditore all'estremità A o B (al posto della forcella) */
+  turnbuckle?: 'none' | 'start' | 'end'
+  /** Regolazione del tenditore: 0 = chiuso (L), 1 = aperto (L¹) */
+  tbOpen?: number
   showLabel?: boolean
 }
 

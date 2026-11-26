@@ -30,6 +30,7 @@ import { partDef, partSourceLabel, useParts } from './utils/partsLib'
 import { KEDER_DIAMETERS } from './utils/kederUtils'
 import { CLAMP_BOLTS, CLAMP_PLATES, clampDims, clampLabel } from './utils/clampUtils'
 import { cushionFrame, cushionLabel } from './utils/cushionUtils'
+import { INOX_SIZES, inoxFork, inoxRopeLength, inoxTurnbuckle, turnbuckleLength } from './utils/ropeInox'
 import { PartCatalog } from './components/PartCatalog'
 import { HatchPattern } from './canvas/HatchPattern'
 import {
@@ -1011,6 +1012,84 @@ function CushionProps({ o, onChange }: { o: CushionObject; onChange: (patch: Par
   )
 }
 
+function RopeProps({ o, onChange }: { o: CableObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const fk = inoxFork(o.size)
+  const tb = inoxTurnbuckle(o.size)
+  const span = cableSpan(o)
+  const setSpan = (L: number) => {
+    const u = span > 0 ? { x: (o.x2 - o.x1) / span, y: (o.y2 - o.y1) / span } : { x: 1, y: 0 }
+    onChange({ x2: o.x1 + u.x * L, y2: o.y1 + u.y * L })
+  }
+  const tbEnd = tb ? (o.turnbuckle ?? 'none') : 'none'
+  const swap = () => onChange({
+    x1: o.x2, y1: o.y2, x2: o.x1, y2: o.y1, startSocket: o.endSocket, endSocket: o.startSocket,
+    turnbuckle: o.turnbuckle === 'start' ? 'end' : o.turnbuckle === 'end' ? 'start' : o.turnbuckle,
+  })
+  const open = o.tbOpen ?? 0.5
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{cableLabel(o)}</div>
+        <div className="muted">Lunghezza fune tra i terminali ≈ {Math.round(inoxRopeLength(o))} mm</div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Fune">
+          <select value={o.size} onChange={e => onChange({ size: Number(e.target.value) })}>
+            {INOX_SIZES.map(d => <option key={d} value={d}>Ø {String(d).replace('.', ',')}</option>)}
+          </select>
+        </Field>
+        <Field label="Interasse perni (mm)">
+          <Num value={span} min={1} onChange={setSpan} />
+        </Field>
+      </div>
+
+      <h4>Terminali</h4>
+      <div className="prop-grid">
+        <label className="check-label">
+          <input type="checkbox" checked={o.startSocket} disabled={tbEnd === 'start'} onChange={e => onChange({ startSocket: e.target.checked })} />
+          Forcella in A
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={o.endSocket} disabled={tbEnd === 'end'} onChange={e => onChange({ endSocket: e.target.checked })} />
+          Forcella in B
+        </label>
+        <Field label="Tenditore" full>
+          <div className="segmented">
+            {([['none', 'Nessuno'], ['start', 'In A'], ['end', 'In B']] as const).map(([k, l]) => (
+              <button key={k} type="button" disabled={!tb && k !== 'none'} className={tbEnd === k ? 'active' : ''}
+                onClick={() => onChange({ turnbuckle: k })}>{l}</button>
+            ))}
+          </div>
+        </Field>
+        {tb && tbEnd !== 'none' && (
+          <Field label={`Regolazione: ${Math.round(turnbuckleLength(tb, open))} mm (L ${tb.L} – L¹ ${tb.L1})`} full>
+            <input type="range" min={0} max={1} step={0.05} value={open} onChange={e => onChange({ tbOpen: +e.target.value })} />
+          </Field>
+        )}
+        {!tb && <p className="muted full-width" style={{ margin: 0 }}>Tenditore non disponibile per la fune Ø {o.size} (da Ø 2,5 a Ø 22).</p>}
+        <button type="button" className="btn-secondary full-width" onClick={swap}>Inverti A ↔ B</button>
+      </div>
+
+      <table className="data-table">
+        <tbody>
+          <tr><th>Forcella</th><td>art. {fk.art} · apertura C {fk.C} · perno Ø {fk.B} · corpo Ø {fk.D} · E {fk.E} mm</td></tr>
+          {tb && <tr><th>Tenditore</th><td>art. {tb.art} · M{tb.A} · perno Ø {tb.B} · apertura C {tb.C} · E {tb.E} mm</td></tr>}
+          {tb && <tr><th>Lunghezza L – L¹</th><td>{tb.L} – {tb.L1} mm</td></tr>}
+          {tb && <tr><th>Carico di rottura tenditore</th><td>{tb.load.toLocaleString('it-IT')} (catalogo)</td></tr>}
+        </tbody>
+      </table>
+      <p className="muted" style={{ margin: 0 }}>Inox AISI 316. Lunghezza del corpo a pressare stimata (non in catalogo).</p>
+
+      <div className="prop-grid">
+        <label className="check-label full-width">
+          <input type="checkbox" checked={o.showLabel !== false} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Mostra designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
 function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   const p = deckProfile(o.profile)
   const t = deckThickness(o)
@@ -1226,7 +1305,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
   useCatalog()
   const counts = new Map<string, number>()
   for (const o of objs) {
-    const label = o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]
+    const label = o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : o.type === 'cable' && o.system === 'inox' ? 'Fune inox' : TYPE_LABEL[o.type]
     counts.set(label, (counts.get(label) ?? 0) + 1)
   }
   // peso dei profili in vista laterale o dall'alto (la sezione non ha lunghezza)
@@ -1303,7 +1382,7 @@ function ObjectProps({ o, onChange, onExplode }: { o: CanvasObject; onChange: (p
   return (
     <div className="properties-form">
       <div className="object-info">
-        <span className="badge">{o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]}</span>
+        <span className="badge">{o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : o.type === 'cable' && o.system === 'inox' ? 'Fune inox' : TYPE_LABEL[o.type]}</span>
         {o.type === 'polyline' && <span className="muted">{o.closed ? o.points.length - 1 : o.points.length} vertici</span>}
       </div>
 
@@ -1483,7 +1562,7 @@ function ObjectProps({ o, onChange, onExplode }: { o: CanvasObject; onChange: (p
         </>
       )}
 
-      {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
+      {o.type === 'cable' && (o.system === 'inox' ? <RopeProps o={o} onChange={onChange} /> : <CableProps o={o} onChange={onChange} />)}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
       {o.type === 'cushion' && <CushionProps o={o} onChange={onChange} />}

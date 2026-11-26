@@ -80,7 +80,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   else if (o.type === 'polyline' && o.keder) parts.push(kederLabel(o.keder))
   else if (o.type === 'envelope') parts.push(`${envelopeLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'seam') parts.push(`${seamLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
-  else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
+  else if (o.type === 'cable') parts.push(`${o.system === 'inox' ? `Fune inox Ø${o.size}` : `FLC ${o.size}`} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'arrow' || o.type === 'quote') parts.push(`${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   if (rotation) parts.push(`${round1(rotation)}°`)
   const label = parts.join('  ·  ')

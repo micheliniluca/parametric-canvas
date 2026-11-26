@@ -25,6 +25,7 @@ import { defaultScrew } from './utils/screwUtils'
 import { makePart, partDef, useParts } from './utils/partsLib'
 import { DEFAULT_KEDER } from './utils/kederUtils'
 import { CUSHION_DEFAULT } from './utils/cushionUtils'
+import { DEFAULT_INOX_SIZE } from './utils/ropeInox'
 import type { KederSpec } from './types'
 import type { WandState } from './canvas/Overlays'
 
@@ -224,8 +225,20 @@ export function Canvas({
   })
 
   // un nuovo cavo riprende taglia e forcelle dell'ultimo cavo disegnato
+  /** fune inox: riprende Ø, forcelle e tenditore dell'ultima fune inox */
+  const makeRope = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'cable' && o.system === 'inox')
+    const prev = last?.type === 'cable' ? last : null
+    return {
+      id: crypto.randomUUID(), type: 'cable', system: 'inox', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      size: prev?.size ?? DEFAULT_INOX_SIZE, startSocket: prev?.startSocket ?? true, endSocket: prev?.endSocket ?? true,
+      turnbuckle: prev?.turnbuckle ?? 'none', tbOpen: prev?.tbOpen ?? 0.5, showLabel: prev?.showLabel ?? true,
+      stroke: prev?.stroke ?? drawStyle.stroke, strokeWidth: 1.5, fillEnabled: true, fillColor: prev?.fillColor ?? '#e2e8f0',
+    }
+  }
+
   const makeCable = (p1: Point, p2: Point): CanvasObject => {
-    const last = [...objects].reverse().find(o => o.type === 'cable')
+    const last = [...objects].reverse().find(o => o.type === 'cable' && o.system !== 'inox')
     return {
       id: crypto.randomUUID(), type: 'cable', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
       size: last?.type === 'cable' ? last.size : DEFAULT_CABLE_SIZE,
@@ -578,6 +591,7 @@ export function Canvas({
         return
       }
       case 'cable':
+      case 'rope':
       case 'clamp':
       case 'cushion':
       case 'deck':
@@ -675,6 +689,8 @@ export function Canvas({
       })
     } else if (tool === 'cable') {
       addObject(makeCable(s.p1, s.p2))
+    } else if (tool === 'rope') {
+      addObject(makeRope(s.p1, s.p2))
     } else if (tool === 'deck') {
       addObject(makeDeck(s.p1, s.p2))
     } else if (tool === 'weld') {
@@ -763,7 +779,7 @@ export function Canvas({
     if (!a) {
       if (segment && tool === 'rect') {
         setSegment({ ...segment, p2: rectCorner(e, segment.p1) })
-      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'clamp' || tool === 'cushion' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
+      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'rope' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'clamp' || tool === 'cushion' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))

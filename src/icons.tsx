@@ -49,6 +49,14 @@ export const IconScrew = ({ size }: Props) => (
   </Svg>
 )
 
+/** Fune inox con forcella e tenditore */
+export const IconRope = ({ size }: Props) => (
+  <Svg size={size}>
+    <circle cx="4.5" cy="12" r="1.6" strokeWidth={1.3} />
+    <path d="M 2 9.5 H 7 L 9 11 H 10 V 13 H 9 L 7 14.5 H 2 M 10 10 H 16 V 14 H 10 M 16 12 H 22" strokeWidth={1.4} strokeLinejoin="round" />
+  </Svg>
+)
+
 /** Cuscino ETFE: due strati ad arco */
 export const IconCushion = ({ size }: Props) => (
   <Svg size={size}>

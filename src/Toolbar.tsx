@@ -61,7 +61,7 @@ const Sep = () => <div className="tb-sep" />
 const FAMILIES: { name: string; tools: ToolId[] }[] = [
   { name: 'Disegno', tools: ['freehand', 'line', 'polyline', 'arrow', 'rect', 'circle'] },
   { name: 'Acciaio', tools: ['profile', 'bolt', 'screw', 'weld'] },
-  { name: 'Membrane', tools: ['part', 'cushion', 'keder', 'clamp', 'cable'] },
+  { name: 'Membrane', tools: ['part', 'cushion', 'keder', 'clamp', 'cable', 'rope'] },
   { name: 'Involucro', tools: ['deck', 'envelope', 'seam'] },
   { name: 'Annotazioni', tools: ['quote', 'bubble', 'measure', 'person'] },
   { name: 'Immagine', tools: ['scale', 'wand', 'crop'] },

@@ -1,4 +1,5 @@
 import type { CableObject, Point } from '../types'
+import { inoxDrawing, inoxLabel } from './ropeInox'
 
 /**
  * Funi spiroidali chiuse FLC (Full Locked Coil) e forcelle fisse TTF.
@@ -130,6 +131,7 @@ export const cableNRd = (o: CableObject) => {
 }
 
 export const cableLabel = (o: CableObject) => {
+  if (o.system === 'inox') return inoxLabel(o)
   const n = socketCount(o)
   return `FLC ${o.size}${n ? ` + ${n === 2 ? '2×' : ''}TTF ${ttfSocket(o.size).size}` : ''}`
 }
@@ -168,6 +170,7 @@ function socketPath(f: Frame, s: TtfSocket, angleDeg: number) {
 }
 
 export function cableDrawing(o: CableObject) {
+  if (o.system === 'inox') return inoxDrawing(o)
   const p1 = { x: o.x1, y: o.y1 }
   const p2 = { x: o.x2, y: o.y2 }
   const L = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1e-6

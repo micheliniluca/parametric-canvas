@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { IconBolt, IconCable, IconDeck, IconDimension, IconEnvelope, IconIPE, IconClamp, IconCushion, IconKeder, IconPart, IconPerson, IconScrew, IconSeam, IconWeld } from './icons'
+import { IconBolt, IconCable, IconDeck, IconDimension, IconEnvelope, IconIPE, IconClamp, IconCushion, IconRope, IconKeder, IconPart, IconPerson, IconScrew, IconSeam, IconWeld } from './icons'
 import {
   MousePointer2,
   Minus,
@@ -38,6 +38,7 @@ export type ToolId =
   | 'keder'
   | 'clamp'
   | 'cushion'
+  | 'rope'
   | 'cable'
   | 'deck'
   | 'weld'
@@ -77,6 +78,7 @@ export const TOOLS: Record<ToolId, ToolDef> = {
   bolt: { id: 'bolt', label: 'Bullone', icon: IconBolt, shortcut: 'B', hint: 'Clic per inserire un bullone (Ctrl = snap). Diametro, vista e ripetizione nel pannello' },
   screw: { id: 'screw', label: 'Vite', icon: IconScrew, shortcut: 'J', hint: 'Clic dove la vite entra nel materiale (Ctrl = snap). Tipo, diametro, lunghezza, testa e punta nel pannello; ruota con la maniglia' },
   keder: { id: 'keder', label: 'Membrana con keder', icon: IconKeder, shortcut: 'X', hint: 'Clic per i vertici dell\'asse della membrana: l\'ultimo punto è il centro del keder · doppio clic o Invio per terminare. Keder all\'inizio/alla fine, Ø e spessore nel pannello' },
+  rope: { id: 'rope', label: 'Fune inox con forcelle / tenditore', icon: IconRope, shortcut: 'Z', hint: 'Clic sul primo perno, clic sul secondo perno (Ctrl = snap). Ø fune, forcelle e tenditore nel pannello' },
   cushion: { id: 'cushion', label: 'Cuscino ETFE', icon: IconCushion, shortcut: 'S', hint: 'Clic sulle due estremità della campata. 2 strati a L/10 verso l\'alto e il basso; 3° strato (L/20) e frecce nel pannello' },
   clamp: { id: 'clamp', label: 'Morsetto radiale per fune', icon: IconClamp, shortcut: 'O', hint: 'Clic sull\'asse del bullone, poi sull\'asse della fune (L = distanza). Ø fune, piatti e bullone nel pannello' },
   part: { id: 'part', label: 'Componente membrana (ETFE / tessuto)', icon: IconPart, shortcut: 'G', hint: 'Scegli il componente nella scheda Componenti, poi clic per inserirlo (Ctrl = snap). Esplodi nel pannello per modificarne le linee' },
@@ -96,5 +98,5 @@ export const TOOLS: Record<ToolId, ToolDef> = {
 /** Strumenti di creazione: disattivano la selezione degli oggetti sotto il cursore */
 export const isCreationTool = (t: ToolId) =>
   t === 'line' || t === 'polyline' || t === 'freehand' || t === 'arrow' ||
-  t === 'bolt' || t === 'screw' || t === 'person' || t === 'part' || t === 'clamp' || t === 'cushion' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'envelope' || t === 'seam' || t === 'quote' || t === 'measure' || t === 'scale' ||
+  t === 'bolt' || t === 'screw' || t === 'person' || t === 'part' || t === 'clamp' || t === 'cushion' || t === 'rope' || t === 'cable' || t === 'deck' || t === 'weld' || t === 'envelope' || t === 'seam' || t === 'quote' || t === 'measure' || t === 'scale' ||
   t === 'rect' || t === 'circle' || t === 'text' || t === 'profile' || t === 'bubble'

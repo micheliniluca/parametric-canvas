@@ -107,6 +107,9 @@ export function Toolbar(p: Props) {
         {toolBtn('bolt')}
         {toolBtn('screw')}
         {toolBtn('person')}
+        {toolBtn('part')}
+        {toolBtn('keder')}
+        {toolBtn('clamp')}
         {toolBtn('cable')}
         {toolBtn('deck')}
         {toolBtn('envelope')}

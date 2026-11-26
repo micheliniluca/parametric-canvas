@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, DeckObject, EnvelopeObject, PersonId, PersonObject, ScrewObject, SeamObject, WeldObject } from './types'
+import type { CableObject, CanvasObject, ClampObject, KederSpec, PolylineObject, DeckObject, EnvelopeObject, PartObject, PersonId, PersonObject, ScrewObject, SeamObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { MaffeisLogo } from './components/MaffeisLogo'
@@ -26,9 +26,13 @@ import { styleCaps } from './style'
 import { round1 } from './utils/mathUtils'
 import { HATCHES, HATCH_GROUPS, hatchDef } from './utils/hatchUtils'
 import { PEOPLE, personDef } from './utils/peopleUtils'
+import { partDef, partSourceLabel, useParts } from './utils/partsLib'
+import { KEDER_DIAMETERS } from './utils/kederUtils'
+import { CLAMP_BOLTS, CLAMP_PLATES, clampDims, clampLabel } from './utils/clampUtils'
+import { PartCatalog } from './components/PartCatalog'
 import { HatchPattern } from './canvas/HatchPattern'
 import {
-  Ban, Database, Download, SlidersHorizontal, MousePointerClick,
+  Ban, Boxes, Database, Download, SlidersHorizontal, MousePointerClick,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
@@ -57,14 +61,19 @@ type Props = {
   /** Profilo in attesa di essere inserito con un clic sulla tela (strumento Profilo attivo) */
   placingProfileCode: string | null
   onPickProfile: (code: string) => void
+  /** Componente membrana in attesa di essere inserito (strumento Componente attivo) */
+  placingPartId: string | null
+  onPickPart: (id: string) => void
+  /** Esplode il componente selezionato */
+  onExplode: () => void
 }
 
-export type PanelTab = 'props' | 'catalog' | 'export'
+export type PanelTab = 'props' | 'catalog' | 'parts' | 'export'
 
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
   symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
-  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite', person: 'Persona',
+  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite', person: 'Persona', part: 'Componente', clamp: 'Morsetto radiale',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -117,7 +126,7 @@ function Num({ value, onChange, min, step }: { value: number; onChange: (v: numb
 /** Pannello laterale: proprietà dell'oggetto selezionato, catalogo profili ed esportazione */
 export function RightPanel({
   selected, objects, onChange, onChangeAll, screenshotMode, setScreenshotMode, onScreenshot,
-  tab, setTab, placingProfileCode, onPickProfile, selectedObjs, onAlign, onGroup, onUngroup,
+  tab, setTab, placingProfileCode, onPickProfile, placingPartId, onPickPart, onExplode, selectedObjs, onAlign, onGroup, onUngroup,
 }: Props) {
   const placing = placingProfileCode ? findProfile(placingProfileCode) : undefined
 
@@ -133,6 +142,9 @@ export function RightPanel({
         </button>
         <button className={tab === 'catalog' ? 'active' : ''} onClick={() => setTab('catalog')}>
           <Database size={15} /> Profili
+        </button>
+        <button className={tab === 'parts' ? 'active' : ''} onClick={() => setTab('parts')}>
+          <Boxes size={15} /> Componenti
         </button>
         <button className={tab === 'export' ? 'active' : ''} onClick={() => setTab('export')}>
           <Download size={15} /> Esporta
@@ -163,6 +175,18 @@ export function RightPanel({
               }}
             />
           </>
+        )}
+
+        {tab === 'parts' && (
+          <PartCatalog
+            placingId={placingPartId}
+            current={selected?.type === 'part' ? selected.part : undefined}
+            onSelect={def => {
+              // con un componente selezionato la scelta lo sostituisce; altrimenti si inserisce con un clic sulla tela
+              if (selected?.type === 'part') onChange({ part: def.id, name: def.n, box: def.b })
+              else onPickPart(def.id)
+            }}
+          />
         )}
 
         {tab === 'export' && (
@@ -201,7 +225,7 @@ export function RightPanel({
           </div>
         )}
 
-        {tab === 'props' && selected && <ObjectProps o={selected} onChange={onChange} />}
+        {tab === 'props' && selected && <ObjectProps o={selected} onChange={onChange} onExplode={onExplode} />}
       </div>
 
       <div className="rp-footer">
@@ -653,13 +677,14 @@ function ScrewProps({ o, onChange }: { o: ScrewObject; onChange: (patch: Partial
   const hexHead = o.head === 'hexWasher' || o.head === 'hex'
   const sheet = o.kind === 'drill' || o.kind === 'tapping'
   const partial = o.kind === 'wood' || o.kind === 'lag'
+  const metric = o.kind === 'machine' || o.kind === 'hammer' || o.kind === 'anchor'
   const nf = (v: number) => String(round1(v)).replace('.', ',')
   return (
     <>
       <div className="profile-id">
         <div className="profile-id-name">{screwLabel(o)}</div>
         <div className="muted">
-          Per {t.use} · testa {nf(D.head.dk)}{D.head.dc ? ` (flangia ${nf(D.head.dc)})` : ''} × {nf(D.head.k)} · passo {nf(D.p)} · nucleo {nf(D.core)} mm
+          Per {t.use} · testa {nf(D.head.dk)}{D.head.dc ? ` (${o.kind === 'anchor' ? 'rondella' : 'flangia'} ${nf(D.head.dc)})` : ''} × {nf(D.head.k)} · passo {nf(D.p)} · nucleo {nf(D.core)} mm
         </div>
       </div>
       <div className="prop-grid">
@@ -677,7 +702,7 @@ function ScrewProps({ o, onChange }: { o: ScrewObject; onChange: (patch: Partial
         </Field>
         <Field label="Diametro">
           <select value={o.diameter} onChange={e => onChange({ diameter: +e.target.value })}>
-            {t.diameters.map(d => <option key={d} value={d}>{sheet ? `ST${nf(d)}` : `Ø ${nf(d)}`}</option>)}
+            {t.diameters.map(d => <option key={d} value={d}>{sheet ? `ST${nf(d)}` : metric ? `M${d}` : `Ø ${nf(d)}`}</option>)}
           </select>
         </Field>
         <Field label="Lunghezza">
@@ -692,12 +717,17 @@ function ScrewProps({ o, onChange }: { o: ScrewObject; onChange: (patch: Partial
             {t.heads.map(h => <option key={h} value={h}>{HEAD_LABEL[h]}{t.std[h] ? ` · ${t.std[h]}` : ''}</option>)}
           </select>
         </Field>
-        <Field label="Punta">
+        {o.kind === 'anchor' && (
+          <Field label="Pezzo fissato">
+            <Num value={o.fixture ?? 10} min={0} step={1} onChange={v => onChange({ fixture: v })} />
+          </Field>
+        )}
+        {t.points.length > 1 && <Field label="Punta">
           <select value={o.point} onChange={e => onChange({ point: e.target.value as ScrewObject['point'] })}>
             {t.points.map(p => <option key={p} value={p}>{POINT_LABEL[p]}</option>)}
           </select>
-        </Field>
-        {!hexHead && (
+        </Field>}
+        {!hexHead && !metric && (
           <Field label="Impronta">
             <select value={o.drive} onChange={e => onChange({ drive: e.target.value as ScrewObject['drive'] })}>
               <option value="PH">Croce (PH)</option>
@@ -818,6 +848,119 @@ function PersonProps({ o, onChange }: { o: PersonObject; onChange: (patch: Parti
         Mostra descrizione sul disegno
       </label>
     </div>
+  )
+}
+
+function PartProps({ o, onChange, onExplode }: { o: PartObject; onChange: (patch: Partial<CanvasObject>) => void; onExplode?: () => void }) {
+  useParts()
+  const def = partDef(o.part)
+  const k = o.scale ?? 1
+  return (
+    <div className="prop-grid">
+      <div className="full-width part-head">
+        <b>{o.name}</b>
+        {def && <span className="muted"> · {def.g} · {partSourceLabel(def.s)}</span>}
+      </div>
+      <Field label="Scala">
+        <select value={SCALES.includes(k) ? String(k) : 'custom'} onChange={e => e.target.value !== 'custom' && onChange({ scale: +e.target.value })}>
+          {SCALES.map(s => <option key={s} value={s}>{s >= 1 ? `${s}:1` : `1:${Math.round(1 / s)}`}</option>)}
+          {!SCALES.includes(k) && <option value="custom">{+k.toFixed(4)}</option>}
+        </select>
+      </Field>
+      <Field label="Verso">
+        <button type="button" className="btn-secondary" onClick={() => onChange({ flipX: !o.flipX })}>
+          {o.flipX ? 'Specchiato' : 'Normale'}
+        </button>
+      </Field>
+      <button type="button" className="btn-secondary full-width" disabled={!def} onClick={onExplode}
+        title="Sostituisce il componente con le sue linee e i suoi testi, raggruppati">
+        Esplodi in linee modificabili
+      </button>
+    </div>
+  )
+}
+
+const SCALES = [1, 0.5, 0.2, 0.1, 2, 5]
+
+function KederProps({ o, onChange }: { o: PolylineObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const k = o.keder!
+  const set = (patch: Partial<KederSpec>) => onChange({ keder: { ...k, ...patch } })
+  return (
+    <div className="prop-grid">
+      <Field label="Ø keder">
+        <select value={k.d} onChange={e => set({ d: +e.target.value })}>
+          {(KEDER_DIAMETERS.includes(k.d) ? KEDER_DIAMETERS : [...KEDER_DIAMETERS, k.d]).map(d => <option key={d} value={d}>Ø {d}</option>)}
+        </select>
+      </Field>
+      <Field label="Spessore membrana">
+        <Num value={k.t} min={0.1} step={0.1} onChange={v => set({ t: v })} />
+      </Field>
+      <Field label="Doppio strato (mm)">
+        <Num value={k.weld} min={0} step={5} onChange={v => set({ weld: v })} />
+      </Field>
+      <div />
+      <label className="check-label">
+        <input type="checkbox" checked={k.start} onChange={e => set({ start: e.target.checked })} />
+        Keder all'inizio
+      </label>
+      <label className="check-label">
+        <input type="checkbox" checked={k.end} onChange={e => set({ end: e.target.checked })} />
+        Keder alla fine
+      </label>
+    </div>
+  )
+}
+
+function ClampProps({ o, onChange }: { o: ClampObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const K = clampDims(o)
+  const setL = (L: number) => {
+    // L si misura dall'asse del bullone: si sposta il centro della fune lungo la stessa direzione
+    const l = K.L || 1
+    onChange({ x2: o.x1 + ((o.x2 - o.x1) / l) * L, y2: o.y1 + ((o.y2 - o.y1) / l) * L })
+  }
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{clampLabel(o)}</div>
+        <div className="muted">Guaina {String(K.ti).replace('.', ',')} mm · interasse piatti al bullone {Math.round(K.g)} mm{K.L < K.Lmin ? ` · L minima ${Math.ceil(K.Lmin)}` : ''}</div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Ø fune">
+          <Num value={o.cableD} min={8} step={2} onChange={v => onChange({ cableD: v })} />
+        </Field>
+        <Field label="L (bullone–fune)">
+          <Num value={Math.round(K.L * 10) / 10} min={1} step={5} onChange={setL} />
+        </Field>
+        <Field label="Spessore piatti">
+          <select value={o.plate} onChange={e => onChange({ plate: +e.target.value })}>
+            {(CLAMP_PLATES.includes(o.plate) ? CLAMP_PLATES : [...CLAMP_PLATES, o.plate]).map(t => <option key={t} value={t}>{t} mm</option>)}
+          </select>
+        </Field>
+        <Field label="Bullone">
+          <select value={o.bolt} onChange={e => onChange({ bolt: +e.target.value })}>
+            {CLAMP_BOLTS.map(d => <option key={d} value={d}>M{d}</option>)}
+          </select>
+        </Field>
+        <Field label="Keder nelle ganasce">
+          <select value={o.kederD ?? 12} onChange={e => onChange({ kederD: +e.target.value })}>
+            {KEDER_DIAMETERS.map(d => <option key={d} value={d}>Ø {d}</option>)}
+          </select>
+        </Field>
+        <div />
+        <label className="check-label">
+          <input type="checkbox" checked={o.showCable !== false} onChange={e => onChange({ showCable: e.target.checked })} />
+          Disegna la fune
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={o.showMembrane !== false} onChange={e => onChange({ showMembrane: e.target.checked })} />
+          Membrana tra le ganasce
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Designazione sul disegno
+        </label>
+      </div>
+    </>
   )
 }
 
@@ -1036,7 +1179,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
   useCatalog()
   const counts = new Map<string, number>()
   for (const o of objs) {
-    const label = o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]
+    const label = o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]
     counts.set(label, (counts.get(label) ?? 0) + 1)
   }
   // peso dei profili in vista laterale o dall'alto (la sezione non ha lunghezza)
@@ -1104,7 +1247,7 @@ function MultiProps({ objs, onAlign, onGroup, onUngroup, onChangeAll }: {
   )
 }
 
-function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+function ObjectProps({ o, onChange, onExplode }: { o: CanvasObject; onChange: (patch: Partial<CanvasObject>) => void; onExplode?: () => void }) {
   useCatalog()
   const endpoint = isEndpoint(o)
   const hasXY = o.type !== 'polyline' && !endpoint
@@ -1113,7 +1256,7 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
   return (
     <div className="properties-form">
       <div className="object-info">
-        <span className="badge">{o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]}</span>
+        <span className="badge">{o.type === 'polyline' && o.keder ? 'Membrana con keder' : o.type === 'polyline' && o.closed ? 'Poligono' : TYPE_LABEL[o.type]}</span>
         {o.type === 'polyline' && <span className="muted">{o.closed ? o.points.length - 1 : o.points.length} vertici</span>}
       </div>
 
@@ -1296,6 +1439,9 @@ function ObjectProps({ o, onChange }: { o: CanvasObject; onChange: (patch: Parti
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
+      {o.type === 'clamp' && <ClampProps o={o} onChange={onChange} />}
+      {o.type === 'polyline' && o.keder && <KederProps o={o} onChange={onChange} />}
+      {o.type === 'part' && <PartProps o={o} onChange={onChange} onExplode={onExplode} />}
       {o.type === 'person' && <PersonProps o={o} onChange={onChange} />}
       {o.type === 'screw' && <ScrewProps o={o} onChange={onChange} />}
       {o.type === 'envelope' && <EnvelopeProps o={o} onChange={onChange} />}

@@ -49,6 +49,32 @@ export const IconScrew = ({ size }: Props) => (
   </Svg>
 )
 
+/** Keder: membrana che avvolge il cordone */
+export const IconKeder = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 2 15 L 13 12.6 M 2 17 L 13 14.6" strokeWidth={1.5} strokeLinecap="round" />
+    <circle cx="17" cy="12.6" r="4.2" strokeWidth={1.5} />
+    <circle cx="17" cy="12.6" r="2" strokeWidth={1.2} />
+  </Svg>
+)
+
+/** Morsetto radiale: piatti a U attorno alla fune */
+export const IconClamp = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 4 9 L 14 7 A 5 5 0 0 1 14 17 L 4 15" strokeWidth={1.5} strokeLinejoin="round" />
+    <circle cx="15" cy="12" r="2.4" strokeWidth={1.3} />
+    <path d="M 5 5.5 V 18.5" strokeWidth={1.8} strokeLinecap="round" />
+  </Svg>
+)
+
+/** Componente membrana: profilo in alluminio con keder */
+export const IconPart = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 4 9 H 9 V 6 H 15 V 9 H 20 V 13 H 15 V 18 H 9 V 13 H 4 Z" strokeWidth={1.5} strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="1.8" strokeWidth={1.5} />
+  </Svg>
+)
+
 /** Persona: sagoma in piedi */
 export const IconPerson = ({ size }: Props) => (
   <Svg size={size}>

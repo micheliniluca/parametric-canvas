@@ -8,6 +8,9 @@ import { weldLabel } from '../utils/weldUtils'
 import { envelopeLabel, seamLabel } from '../utils/envelopeUtils'
 import { screwLabel } from '../utils/screwUtils'
 import { personLabel } from '../utils/peopleUtils'
+import { partLabel } from '../utils/partsLib'
+import { clampLabel } from '../utils/clampUtils'
+import { kederLabel } from '../utils/kederUtils'
 import { textLeader } from '../utils/leaderUtils'
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br'
@@ -70,6 +73,9 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   else if (o.type === 'weld') parts.push(weldLabel(o))
   else if (o.type === 'screw') parts.push(screwLabel(o))
   else if (o.type === 'person') parts.push(personLabel(o))
+  else if (o.type === 'part') parts.push(partLabel(o))
+  else if (o.type === 'clamp') parts.push(clampLabel(o))
+  else if (o.type === 'polyline' && o.keder) parts.push(kederLabel(o.keder))
   else if (o.type === 'envelope') parts.push(`${envelopeLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'seam') parts.push(`${seamLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'cable') parts.push(`FLC ${o.size} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)

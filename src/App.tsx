@@ -16,6 +16,7 @@ import type { AlignKind } from './canvas/geometry'
 import { captureSvgToClipboard } from './utils/capture'
 import { migrateObjects } from './utils/boltUtils'
 import { DEFAULT_PROFILE_CODE, loadCatalog, useCatalog } from './profiles'
+import { explodePart, partsLoaded } from './utils/partsLib'
 import {
   loadAutosave, openProjectFile, resetFileHandle, saveProjectFile, serializeProject, writeAutosave,
 } from './utils/project'
@@ -49,6 +50,7 @@ export default function App() {
   const [panelTab, setPanelTab] = useState<PanelTab>('props')
   /** Profilo che lo strumento Profilo inserisce al clic */
   const [placeProfile, setPlaceProfile] = useState(DEFAULT_PROFILE_CODE)
+  const [placePart, setPlacePart] = useState<string | null>(null)
   const [screenshotMode, setScreenshotMode] = useState<ScreenshotMode>('white')
   const [cursor, setCursor] = useState<Point | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -69,6 +71,11 @@ export default function App() {
     if (t === 'profile') {
       setPanelOpen(true)
       setPanelTab('catalog')
+    }
+    // lo strumento Componente apre la libreria delle membrane
+    if (t === 'part') {
+      setPanelOpen(true)
+      setPanelTab('parts')
     }
     // gli strumenti che lavorano su un oggetto mantengono la selezione
     if (t !== 'select' && !TOOLS[t].keepSelection) setSelectedId(null)
@@ -499,6 +506,7 @@ export default function App() {
             onCursorMove={setCursor}
             notify={notify}
             placeProfileCode={placeProfile}
+            placePartId={placePart}
             nextBubbleNumber={nextBubbleNumber}
             onBubblePlaced={() => setNextBubbleNumber(n => n + 1)}
           />
@@ -551,6 +559,17 @@ export default function App() {
               tab={panelTab}
               setTab={setPanelTab}
               placingProfileCode={tool === 'profile' ? placeProfile : null}
+              placingPartId={tool === 'part' ? placePart : null}
+              onPickPart={id => {
+                setPlacePart(id)
+                setTool('part')
+              }}
+              onExplode={() => {
+                if (selected?.type !== 'part' || !partsLoaded()) return
+                const parts = explodePart(selected)
+                setObjects(objs => objs.flatMap(o => (o.id === selected.id ? parts : [o])))
+                setSelectedIds(parts.map(p => p.id))
+              }}
               onPickProfile={code => {
                 setPlaceProfile(code)
                 setTool('profile')

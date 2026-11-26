@@ -35,11 +35,14 @@ npm run dev
 | K | Scala con due punti (clic su due punti dell'immagine, poi la misura reale) |
 | Ctrl+L | Blocca / sblocca l'oggetto selezionato |
 | B | Bullone: clic per inserirlo; diametro, classe, vista (testa, dado, foro, sezione) e ripetizione nel pannello |
-| J | Vite: clic dove entra nel materiale; autoperforanti (ISO 15480/15481/15482), autofilettanti (ISO 1479/7049/7050), legno (EN 14592), tirafondi (DIN 571), cartongesso, Aquapanel Maxi Screw, calcestruzzo; vista laterale o dalla testa, diametro, lunghezza, testa, punta, impronta, rondella EPDM |
+| J | Vite: clic dove entra nel materiale; autoperforanti (ISO 15480/15481/15482), autofilettanti (ISO 1479/7049/7050), legno (EN 14592), tirafondi (DIN 571), cartongesso, Aquapanel Maxi Screw, calcestruzzo, viti metriche (ISO 4762, 10642, 7380, 4017), viti a testa di martello per la cava dei profili, ancoranti Hilti HSA e HSL-G-TZ (con spessore del pezzo fissato); vista laterale o dalla testa, diametro, lunghezza, testa, punta, impronta, rondella EPDM |
 | H | Lamiera grecata (ComFlor 46, 60, 80, 100): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | W | Saldatura (ISO 2553 o AWS A2.4): clic sul giunto, clic dove va la linea di riferimento; tipo (angolo, I, V, mezza V, Y, mezza Y, U, J; su due lati X, K…), lato, quote, a tratti, tutto intorno, in opera, finitura, coda con procedimento e testo libero; cordone pieno in scala sulla punta della freccia |
 | Y | Persona in scala: clic dove poggia i piedi; figura dal menu (operai con casco, pala, sacco, in ginocchio, con scala; pubblico: uomo, donna, bambino, anziano, carrozzina, con borsa; tifosi con braccia alzate, sciarpa, bandiera, seduti), frontali o di profilo; altezza 1,80 m variabile, verso, sagoma piena anche nel DXF (layer PERSONE) |
+| X | Membrana con keder (in sezione): polilinea = asse della membrana, l'ultimo (e/o il primo) punto è il centro del keder; Ø keder, spessore, tratto a doppio strato saldato, keder all'inizio e/o alla fine |
+| O | Morsetto radiale per fune: clic sull'asse del bullone e sull'asse della fune (L = distanza); Ø fune, spessore dei piatti, bullone M10–M24, guaina, due ganasce in alluminio al bullone con scanalatura per il keder (Ø a scelta) e membrana stretta tra le ganasce; fune, membrana e designazione facoltative |
+| G | Componente per membrane (ETFE e tessuto PTFE): scheda **Componenti** con anteprime, filtro ETFE / tessuto, gruppi (profili in alluminio, guarnizioni e keder, funi e terminali) e ricerca; clic sulla tela per inserirlo in grandezza reale. Scala, verso, rotazione; **Esplodi** lo trasforma in polilinee e testi raggruppati e modificabili. Nel DXF sul layer COMPONENTI |
 | E | Involucro in sezione: clic su inizio e fine della faccia d'appoggio; isolante (retino a spirale), pannello sandwich (parete piana o copertura grecata, giunti) vetro (composizione tipo 6/16/6, 33.1/16/6, con distanziatori) o parete Knauf Aquapanel Outdoor (rasatura, lastra 12,5, Tyvek, montanti C MgZ con isolante, orditura singola o doppia, lastre interne); spessore e lato nel pannello |
 | U | Copertura aggraffata (standing seam) in sezione: clic su inizio e fine del piano di posa; doppia aggraffatura, angolare o a scatto, altezza nervatura e passo di posa |
 | Q / M | Quota (frecce o trattino obliquo alle estremità, nel pannello) / Misura |
@@ -92,6 +95,7 @@ src/
   utils/envelopeUtils.ts  involucro in sezione: isolante, pannello sandwich, vetro, Aquapanel, copertura aggraffata
   utils/screwUtils.ts  viti: dimensioni normalizzate, vista laterale e dalla testa
   utils/peopleUtils.ts  sagome di persone in scala (catalogo frontale e di profilo)
+  utils/partsLib.ts     libreria componenti membrana (data/membraneParts.json, caricata a richiesta)
   utils/hatchUtils.ts  retini dei materiali: moduli ripetibili e ritaglio per l'export DXF
   utils/boltUtils.ts   dimensioni ISO dei bulloni, viste, lunghezza, conversione dei vecchi disegni
   icons.tsx            icone tecniche (bullone, IPE, quota ISO)

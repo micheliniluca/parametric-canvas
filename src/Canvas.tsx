@@ -22,6 +22,9 @@ import { DEFAULT_DECK, deckProfile } from './utils/deckUtils'
 import { defaultBeadRot } from './utils/weldUtils'
 import { ENVELOPE_KINDS } from './utils/envelopeUtils'
 import { defaultScrew } from './utils/screwUtils'
+import { makePart, partDef, useParts } from './utils/partsLib'
+import { DEFAULT_KEDER } from './utils/kederUtils'
+import type { KederSpec } from './types'
 import type { WandState } from './canvas/Overlays'
 
 /** Distanze in pixel schermo (convertite in unità mondo dividendo per lo zoom) */
@@ -56,6 +59,8 @@ type Props = {
   notify?: (msg: string) => void
   /** Codice del profilo da inserire con lo strumento Profilo */
   placeProfileCode: string
+  /** componente membrana da inserire (strumento Componente) */
+  placePartId: string | null
   /** Numero del prossimo bollino e funzione che lo fa avanzare */
   nextBubbleNumber: number
   onBubblePlaced: () => void
@@ -83,8 +88,10 @@ export function Canvas({
   objects, setObjects, selectedIds, setSelectedIds,
   view, setView, zoom, setZoom,
   gridSize, showGrid, snapEnabled, orthoEnabled,
-  tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode, nextBubbleNumber, onBubblePlaced,
+  tool, setTool, drawStyle, onCursorMove, notify, placeProfileCode, placePartId, nextBubbleNumber, onBubblePlaced,
 }: Props) {
+  // la libreria dei componenti membrana si carica alla prima richiesta (anteprima e inserimento)
+  useParts(tool === 'part')
   const svgRef = useRef<SVGSVGElement>(null)
   const action = useRef<Interaction | null>(null)
   const [size, setSize] = useState({ w: 1200, h: 800 })
@@ -256,6 +263,17 @@ export function Canvas({
       aqInnerStud: prev?.aqInnerStud ?? 50, aqGap: prev?.aqGap ?? 10, aqBoards: prev?.aqBoards ?? 1, aqInsulation: prev?.aqInsulation ?? true,
       stroke: drawStyle.stroke, strokeWidth: 1, fillEnabled: true,
       fillColor: prev?.fillColor ?? ENVELOPE_KINDS.find(k => k.id === kind)!.fill,
+    }
+  }
+
+  /** un nuovo morsetto riprende fune, piatti e bullone dell'ultimo */
+  const makeClamp = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'clamp')
+    const prev = last?.type === 'clamp' ? last : null
+    return {
+      id: crypto.randomUUID(), type: 'clamp', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      cableD: prev?.cableD ?? 60, plate: prev?.plate ?? 5, bolt: prev?.bolt ?? 16,
+      showCable: prev?.showCable ?? true, kederD: prev?.kederD ?? 12, showMembrane: prev?.showMembrane ?? true, showLabel: false, stroke: prev?.stroke ?? drawStyle.stroke, strokeWidth: 0.5,
     }
   }
 
@@ -522,6 +540,17 @@ export function Canvas({
         })
         return
       }
+      case 'part': {
+        const def = partDef(placePartId ?? undefined)
+        if (!def) {
+          notify?.('Scegli prima un componente nella scheda Componenti')
+          return
+        }
+        // riprende scala, verso e colore dell'ultimo componente inserito
+        const last = [...objects].reverse().find(o => o.type === 'part')
+        addObject(makePart(def, pick(e), last?.type === 'part' ? last : { stroke: drawStyle.stroke }))
+        return
+      }
       case 'person': {
         // una nuova persona riprende figura e altezza dell'ultima
         const p = pick(e)
@@ -535,6 +564,7 @@ export function Canvas({
         return
       }
       case 'cable':
+      case 'clamp':
       case 'deck':
       case 'envelope':
       case 'seam':
@@ -562,6 +592,7 @@ export function Canvas({
         setSegment(null)
         return
       }
+      case 'keder':
       case 'polyline': {
         const last = polyPoints?.[polyPoints.length - 1]
         const p = pick(e, last)
@@ -573,8 +604,8 @@ export function Canvas({
           finishPolyline(false)
           return
         }
-        // clic sul primo punto: chiude la forma
-        if (polyPoints.length >= 3 && dist(p, polyPoints[0]) < SNAP_PX / zoom) {
+        // clic sul primo punto: chiude la forma (non per la membrana con keder)
+        if (tool === 'polyline' && polyPoints.length >= 3 && dist(p, polyPoints[0]) < SNAP_PX / zoom) {
           finishPolyline(true)
           return
         }
@@ -637,6 +668,8 @@ export function Canvas({
       addObject(makeEnvelope(s.p1, s.p2))
     } else if (tool === 'seam') {
       addObject(makeSeam(s.p1, s.p2))
+    } else if (tool === 'clamp') {
+      addObject(makeClamp(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -648,6 +681,17 @@ export function Canvas({
     const pts = polyPoints ?? []
     setPolyPoints(null)
     if (pts.length < 2) return
+    if (tool === 'keder') {
+      // riprende diametro, spessore ed estremità dell'ultima membrana con keder
+      const last = [...objects].reverse().find(o => o.type === 'polyline' && o.keder)
+      const prev = last?.type === 'polyline' ? last : null
+      addObject({
+        id: crypto.randomUUID(), type: 'polyline', points: pts, closed: false,
+        stroke: prev?.stroke ?? drawStyle.stroke, strokeWidth: prev?.strokeWidth ?? 0.35, fillEnabled: false,
+        keder: prev?.keder ?? DEFAULT_KEDER,
+      })
+      return
+    }
     addObject({
       id: crypto.randomUUID(), type: 'polyline',
       points: closed ? [...pts, pts[0]] : pts, closed,
@@ -702,7 +746,7 @@ export function Canvas({
     if (!a) {
       if (segment && tool === 'rect') {
         setSegment({ ...segment, p2: rectCorner(e, segment.p1) })
-      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
+      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'clamp' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -1028,6 +1072,18 @@ export function Canvas({
               )
             })()}
 
+            {/* anteprima del componente da inserire */}
+            {tool === 'part' && hover && (() => {
+              const def = partDef(placePartId ?? undefined)
+              if (!def) return null
+              const last = [...objects].reverse().find(o => o.type === 'part')
+              return (
+                <g opacity={0.45} pointerEvents="none">
+                  <ObjectView o={makePart(def, hover, last?.type === 'part' ? last : { stroke: drawStyle.stroke })} interactive={false} onMouseDown={() => {}} />
+                </g>
+              )
+            })()}
+
             {/* anteprima del prossimo bollino */}
             {tool === 'bubble' && hover && (
               <g opacity={0.45} pointerEvents="none">
@@ -1074,6 +1130,11 @@ export function Canvas({
                   interactive={false} onMouseDown={() => {}} />
               </g>
             )}
+            {segment && tool === 'clamp' && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={makeClamp(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
             {segment && tool === 'weld' && dist(segment.p1, segment.p2) > 0 && (
               <g opacity={0.55} pointerEvents="none">
                 <ObjectView o={makeWeld(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
@@ -1096,6 +1157,15 @@ export function Canvas({
                   stroke="#dc2626" strokeWidth={1.5 * k} />
                 <circle cx={measure.p1.x} cy={measure.p1.y} r={3 * k} fill="#dc2626" />
                 <circle cx={measure.p2.x} cy={measure.p2.y} r={3 * k} fill="#dc2626" />
+              </g>
+            )}
+            {polyPoints && tool === 'keder' && polyPoints.length + (hover ? 1 : 0) >= 2 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={{
+                  id: 'draft', type: 'polyline', points: [...polyPoints, ...(hover ? [hover] : [])], closed: false,
+                  stroke: drawStyle.stroke, strokeWidth: 0.35, fillEnabled: false,
+                  keder: ([...objects].reverse().find(o => o.type === 'polyline' && o.keder) as { keder?: KederSpec } | undefined)?.keder ?? DEFAULT_KEDER,
+                }} interactive={false} onMouseDown={() => {}} />
               </g>
             )}
             {polyPoints && (

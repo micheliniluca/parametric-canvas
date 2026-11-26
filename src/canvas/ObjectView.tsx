@@ -8,6 +8,9 @@ import { CONCRETE_TILE, concreteHatch, deckDrawing, deckLabel, deckLabelPlacemen
 import { weldDrawing } from '../utils/weldUtils'
 import { screwDrawing, screwLabel } from '../utils/screwUtils'
 import { personBounds, personLabel, personPath } from '../utils/peopleUtils'
+import { PartView } from './PartView'
+import { kederDrawing } from '../utils/kederUtils'
+import { clampDrawing, clampLabel } from '../utils/clampUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from '../utils/envelopeUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
@@ -107,6 +110,19 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
       )
 
     case 'polyline': {
+      if (o.keder) {
+        const sw = o.strokeWidth ?? 0.35
+        const dr = kederDrawing(o.points, o.keder)
+        return (
+          <g transform={transform} onPointerDown={down} pointerEvents={pe}>
+            <path d={dr.outline} fill={o.fillEnabled ? o.fillColor || '#e2e8f0' : 'transparent'} fillRule="evenodd" fillOpacity={fo}
+              stroke={stroke} strokeWidth={sw} strokeLinejoin="round" pointerEvents={pe} />
+            <polyline points={o.points.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="transparent"
+              strokeWidth={Math.max(8, o.keder.d)} pointerEvents={interactive ? 'stroke' : 'none'} />
+            <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.5} pointerEvents="none" />
+          </g>
+        )
+      }
       const sw = o.strokeWidth ?? 2
       const pts = o.points.map(p => `${p.x},${p.y}`).join(' ')
       const filled = o.closed && o.fillEnabled
@@ -275,6 +291,30 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
         </g>
       )
     }
+
+    case 'clamp': {
+      const sw = o.strokeWidth ?? 0.5
+      const dr = clampDrawing(o)
+      const b = dr.bounds
+      return (
+        <g onPointerDown={down} pointerEvents={pe}>
+          <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" pointerEvents={pe} />
+          <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.6} strokeWidth={sw * 0.35}
+            strokeDasharray={`${sw * 12} ${sw * 3} ${sw * 2} ${sw * 3}`} pointerEvents="none" />
+          <path d={dr.outline} fill={o.fillEnabled ? o.fillColor || 'white' : 'none'} fillOpacity={fo}
+            stroke={stroke} strokeWidth={sw} strokeLinejoin="round" pointerEvents="none" />
+          <path d={dr.thin} fill="none" stroke={stroke} strokeWidth={sw * 0.5} pointerEvents="none" />
+          {o.showLabel && (
+            <text x={b.x + b.w + 6} y={b.y + 10} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+              {clampLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'part':
+      return <PartView o={o} transform={transform} pe={pe} down={down} stroke={stroke} />
 
     case 'person': {
       const b = personBounds(o)

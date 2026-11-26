@@ -1,4 +1,5 @@
 import type { Point, ScrewObject } from '../types'
+import { isMetric, metricDrawing, metricHead, metricLabel, metricThread } from './screwMetric'
 
 /**
  * Viti per acciaio, lamiera, legno, cartongesso, Aquapanel e calcestruzzo.
@@ -105,15 +106,38 @@ export const SCREW_TYPES: ScrewType[] = [
     def: { d: 10, L: 80, head: 'hexWasher', point: 'blunt', drive: 'none' },
     std: {},
   },
+  {
+    id: 'machine', label: 'Vite metrica', use: 'acciaio e alluminio',
+    diameters: [5, 6, 8, 10, 12, 14, 16], lengths: [10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 60, 65, 70, 80, 90, 100, 120],
+    heads: ['socketCap', 'socketCsk', 'button', 'hex'], points: ['flat'],
+    def: { d: 10, L: 30, head: 'socketCap', point: 'flat', drive: 'none' },
+    std: { socketCap: 'ISO 4762', socketCsk: 'ISO 10642', button: 'ISO 7380', hex: 'ISO 4017' },
+  },
+  {
+    id: 'hammer', label: 'Vite a testa di martello', use: 'cava dei profili in alluminio',
+    diameters: [6, 8, 10, 12], lengths: [16, 20, 25, 30, 35, 40, 50, 60],
+    heads: ['hammer'], points: ['flat'],
+    def: { d: 10, L: 30, head: 'hammer', point: 'flat', drive: 'none' },
+    std: {},
+  },
+  {
+    id: 'anchor', label: 'Ancorante Hilti', use: 'calcestruzzo',
+    diameters: [8, 10, 12, 16], lengths: [75, 90, 100, 115, 130, 145, 160, 180, 200, 220],
+    heads: ['hsa', 'hsl'], points: ['flat'],
+    def: { d: 10, L: 115, head: 'hsa', point: 'flat', drive: 'none' },
+    std: { hsa: 'HSA', hsl: 'HSL-G-TZ' },
+  },
 ]
 
 export const screwType = (kind: ScrewObject['kind']) => SCREW_TYPES.find(t => t.id === kind) ?? SCREW_TYPES[0]
 
 export const HEAD_LABEL: Record<ScrewHead, string> = {
   hexWasher: 'Esagonale flangiata', hex: 'Esagonale', pan: 'Bombata', countersunk: 'Svasata piana', bugle: 'A trombetta',
+  socketCap: 'Cilindrica, esagono incassato', socketCsk: 'Svasata, esagono incassato', button: 'Bombata, esagono incassato',
+  hammer: 'A martello', hsa: 'Ad espansione (barra e dado)', hsl: 'Pesante a manicotto',
 }
 export const POINT_LABEL: Record<ScrewPoint, string> = {
-  drill: 'Punta trapano (TEKS)', cone: 'Punta conica', blunt: 'Punta smussata', gimlet: 'Punta a succhiello', needle: 'Punta chiodo (HS)',
+  drill: 'Punta trapano (TEKS)', cone: 'Punta conica', blunt: 'Punta smussata', gimlet: 'Punta a succhiello', needle: 'Punta chiodo (HS)', flat: 'Piana smussata',
 }
 
 /** Dimensioni usate per il disegno */
@@ -128,6 +152,10 @@ export type ScrewDims = {
 }
 
 export const screwDims = (o: ScrewObject): ScrewDims => {
+  if (isMetric(o)) {
+    const th = metricThread(o.diameter)
+    return { d: o.diameter, core: th.core, p: th.p, head: metricHead(o), thread: o.length, shank: o.diameter, tip: 0 }
+  }
   const d = o.diameter
   const L = o.length
   const st = ST[d] ?? ST[4.8]
@@ -194,6 +222,7 @@ export type ScrewDrawing = {
 
 /** Disegno in coordinate mondo non ruotate, con origine in (o.x, o.y) */
 export function screwDrawing(o: ScrewObject): ScrewDrawing {
+  if (isMetric(o)) return metricDrawing(o)
   const D = screwDims(o)
   const P = (x: number, y: number): Point => ({ x: o.x + x, y: o.y + y })
   let outline = '', thin = '', axis = ''
@@ -348,6 +377,7 @@ export const screwBounds = (o: ScrewObject) => screwDrawing(o).bounds
 const nf = (n: number) => String(+n.toFixed(1)).replace('.', ',')
 
 export const screwLabel = (o: ScrewObject): string => {
+  if (isMetric(o)) return metricLabel(o)
   const t = screwType(o.kind)
   const size = o.kind === 'drill' || o.kind === 'tapping' ? `ST${nf(o.diameter)}` : `Ø${nf(o.diameter)}`
   const std = t.std[o.head]

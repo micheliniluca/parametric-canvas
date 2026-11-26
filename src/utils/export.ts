@@ -6,6 +6,9 @@ import { cableDrawing, cableLabel } from './cableUtils'
 import { deckDrawing, deckLabel, deckLabelPlacement } from './deckUtils'
 import { screwDrawing, screwLabel } from './screwUtils'
 import { personBounds, personLabel, personPolygons } from './peopleUtils'
+import { partDef, partWorld } from './partsLib'
+import { kederDrawing } from './kederUtils'
+import { clampDrawing, clampLabel } from './clampUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from './envelopeUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
@@ -22,7 +25,7 @@ import { hatchDef, hatchGeometry } from './hatchUtils'
  * I retini dei materiali vengono esplosi in linee e puntini sul layer RETINI.
  */
 
-type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI' | 'RETINI' | 'PERSONE'
+type Layer = 'DISEGNO' | 'TESTI' | 'ANNOTAZIONI' | 'QUOTE' | 'PROFILI' | 'BULLONI' | 'CAVI' | 'LAMIERE' | 'CALCESTRUZZO' | 'PIOLI' | 'SALDATURE' | 'INVOLUCRO' | 'NASCOSTE' | 'ASSI' | 'RETINI' | 'PERSONE' | 'COMPONENTI'
 
 const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CENTER' }[] = [
   { name: 'DISEGNO', color: 7, ltype: 'CONTINUOUS' },
@@ -41,6 +44,7 @@ const LAYERS: { name: Layer; color: number; ltype: 'CONTINUOUS' | 'DASHED' | 'CE
   { name: 'ASSI', color: 8, ltype: 'CENTER' },
   { name: 'RETINI', color: 9, ltype: 'CONTINUOUS' },
   { name: 'PERSONE', color: 8, ltype: 'CONTINUOUS' },
+  { name: 'COMPONENTI', color: 7, ltype: 'CONTINUOUS' },
 ]
 
 type Ent =
@@ -179,6 +183,12 @@ function entitiesOf(o: CanvasObject): Ent[] {
       break
 
     case 'polyline': {
+      if (o.keder) {
+        const dr = kederDrawing(o.points, o.keder)
+        path('COMPONENTI', dr.outline)
+        path('COMPONENTI', dr.thin)
+        break
+      }
       const closed = o.closed && o.points.length > 2
       const pts = closed ? o.points.slice(0, -1) : o.points
       poly('DISEGNO', pts, closed)
@@ -260,6 +270,30 @@ function entitiesOf(o: CanvasObject): Ent[] {
       if (o.showLabel) {
         const b = boltBounds(o)
         text('BULLONI', { x: b.x + b.w + 6, y: b.y - 4 }, 12, boltLabel(o), 0, 'left', 'baseline')
+      }
+      break
+    }
+
+    case 'clamp': {
+      const dr = clampDrawing(o)
+      path('COMPONENTI', dr.outline)
+      path('COMPONENTI', dr.thin)
+      path('ASSI', dr.axis)
+      if (o.showLabel) text('COMPONENTI', { x: dr.bounds.x + dr.bounds.w + 6, y: dr.bounds.y + 10 }, 12, clampLabel(o), 0, 'left', 'baseline')
+      break
+    }
+
+    case 'part': {
+      // coordinate già ruotate: niente R()
+      const def = partDef(o.part)
+      if (!def) break
+      const g = partWorld(o, def)
+      for (const l of g.lines) if (l.pts.length > 1) out.push({ kind: 'poly', layer: 'COMPONENTI', color, pts: l.pts, closed: l.closed })
+      for (const f of g.fills) {
+        for (const t of triangulate(f)) out.push({ kind: 'solid', layer: 'COMPONENTI', color, pts: [t[0], t[1], t[2]] })
+      }
+      for (const t of g.texts) {
+        out.push({ kind: 'text', layer: 'COMPONENTI', color, p: t.p, height: t.height, text: t.text, rot: t.rot, align: 'left', valign: 'baseline' })
       }
       break
     }

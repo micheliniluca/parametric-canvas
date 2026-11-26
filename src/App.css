@@ -1026,3 +1026,63 @@ button:disabled {
 .hatch-swatch.hatch-none {
   color: var(--text-muted);
 }
+
+/* ================= COMPONENTI MEMBRANA ================= */
+
+.parts-catalog .catalog-tabs {
+  flex-wrap: wrap;
+}
+
+.parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.part-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 4px;
+  background: white;
+  color: #1e293b;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.part-card svg {
+  width: 100%;
+  height: 64px;
+}
+
+.part-card:hover {
+  border-color: var(--text-muted);
+}
+
+.part-card.current {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.part-name {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.part-head {
+  font-size: 0.8rem;
+}
+
+.parts-catalog .catalog-tabs button {
+  flex: 1 1 45%;
+  padding: 5px 6px;
+}

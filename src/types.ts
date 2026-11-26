@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw' | 'person'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw' | 'person' | 'part' | 'clamp'
   x: number
   y: number
   stroke?: string
@@ -109,6 +109,41 @@ export type PolylineObject = {
   patternScale?: number
   /** Angolo del retino in gradi */
   patternAngle?: number
+  /** Membrana con keder: la polilinea è l'asse della membrana */
+  keder?: KederSpec
+}
+
+/** Membrana in sezione con keder alle estremità (diametro del cordone, spessore, tratto a doppio strato) */
+export type KederSpec = {
+  d: number
+  t: number
+  weld: number
+  start: boolean
+  end: boolean
+}
+
+/**
+ * Morsetto radiale per fune (in pianta). (x1, y1) = asse del bullone, (x2, y2) = asse della fune:
+ * L = distanza tra i due.
+ */
+export type ClampObject = BaseObject & {
+  type: 'clamp'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  /** diametro della fune (mm) */
+  cableD: number
+  /** spessore dei piatti (mm) */
+  plate: number
+  /** bullone M */
+  bolt: number
+  showCable?: boolean
+  /** Ø del keder stretto tra le ganasce in alluminio (mm) */
+  kederD?: number
+  /** membrana con keder tra le ganasce */
+  showMembrane?: boolean
+  showLabel?: boolean
 }
 
 export type ImageObject = BaseObject & {
@@ -312,13 +347,13 @@ export type SeamObject = BaseObject & {
  */
 export type ScrewObject = BaseObject & {
   type: 'screw'
-  kind: 'drill' | 'tapping' | 'wood' | 'lag' | 'plaster' | 'aquapanel' | 'concrete'
+  kind: 'drill' | 'tapping' | 'wood' | 'lag' | 'plaster' | 'aquapanel' | 'concrete' | 'machine' | 'hammer' | 'anchor'
   view: 'side' | 'head'
   diameter: number
   /** Lunghezza nominale (mm): sotto la testa, o totale per le teste a filo */
   length: number
-  head: 'hexWasher' | 'hex' | 'pan' | 'countersunk' | 'bugle'
-  point: 'drill' | 'cone' | 'blunt' | 'gimlet' | 'needle'
+  head: 'hexWasher' | 'hex' | 'pan' | 'countersunk' | 'bugle' | 'socketCap' | 'socketCsk' | 'button' | 'hammer' | 'hsa' | 'hsl'
+  point: 'drill' | 'cone' | 'blunt' | 'gimlet' | 'needle' | 'flat'
   drive: 'PH' | 'TX' | 'none'
   /** Legno: filetto totale o lunghezza filettata */
   fullThread?: boolean
@@ -326,6 +361,8 @@ export type ScrewObject = BaseObject & {
   /** Rondella con guarnizione EPDM (lamiere) */
   washer?: boolean
   washerD?: number
+  /** Ancoranti: spessore del pezzo fissato (mm) */
+  fixture?: number
   showLabel?: boolean
 }
 
@@ -345,6 +382,20 @@ export type PersonObject = BaseObject & {
   showLabel?: boolean
 }
 
+/** Componente per membrane dalla libreria (utils/partsLib): blocco esplodibile */
+export type PartObject = BaseObject & {
+  type: 'part'
+  /** id nella libreria */
+  part: string
+  /** nome (copiato dalla libreria: resta leggibile anche senza caricarla) */
+  name: string
+  /** ingombro locale [x0, y0, x1, y1] in mm rispetto al punto di inserimento */
+  box: [number, number, number, number]
+  /** fattore di scala (1 = grandezza reale) */
+  scale?: number
+  flipX?: boolean
+}
+
 export type SymbolType = 'bubble'
 
 export type SymbolObject = BaseObject & {
@@ -356,4 +407,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject | PersonObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject | PersonObject | PartObject | ClampObject

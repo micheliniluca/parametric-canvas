@@ -1,4 +1,4 @@
-import type { ArrowObject, CableObject, CanvasObject, DeckObject, EnvelopeObject, Point, QuoteObject, SeamObject, WeldObject } from '../types'
+import type { ArrowObject, CableObject, CanvasObject, ClampObject, DeckObject, EnvelopeObject, Point, QuoteObject, SeamObject, WeldObject } from '../types'
 import { findProfile } from '../profiles'
 import { getBeamPoints } from '../beamPath'
 import { boltBounds, boltCenters } from '../utils/boltUtils'
@@ -8,12 +8,15 @@ import { weldBounds } from '../utils/weldUtils'
 import { envelopeBounds, seamBounds } from '../utils/envelopeUtils'
 import { screwBounds } from '../utils/screwUtils'
 import { personBounds } from '../utils/peopleUtils'
+import { partBounds } from '../utils/partsLib'
+import { kederDrawing } from '../utils/kederUtils'
+import { clampDrawing } from '../utils/clampUtils'
 
 /** Oggetti definiti da due estremità (x1, y1) – (x2, y2) */
-export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject
+export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ClampObject
 export const isEndpoint = (o: CanvasObject): o is EndpointObject =>
   o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck' || o.type === 'weld' ||
-  o.type === 'envelope' || o.type === 'seam'
+  o.type === 'envelope' || o.type === 'seam' || o.type === 'clamp'
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -66,7 +69,7 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
     case 'symbol':
       return { x: o.x - 15, y: o.y - 15, w: 30, h: 30 }
     case 'polyline':
-      return fromPoints(o.points)
+      return fromPoints(o.keder ? kederDrawing(o.points, o.keder).pts : o.points)
     case 'arrow':
     case 'quote':
       return fromPoints([{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }])
@@ -76,6 +79,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return screwBounds(o)
     case 'person':
       return personBounds(o)
+    case 'part':
+      return partBounds(o)
     case 'cable':
       return cableBounds(o)
     case 'deck':
@@ -86,6 +91,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return envelopeBounds(o)
     case 'seam':
       return seamBounds(o)
+    case 'clamp':
+      return clampDrawing(o).bounds
     case 'profile': {
       const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
@@ -119,6 +126,7 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     case 'weld':
     case 'envelope':
     case 'seam':
+    case 'clamp':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
     case 'text':
       return { ...o, x: o.x + dx, y: o.y + dy, leader: o.leader && mv(o.leader) }
@@ -161,7 +169,7 @@ export const mirrorObject = (o: CanvasObject, ax: number): CanvasObject => {
   const c = getObjectCenter(o)
   const moved = translateObject(o, 2 * ax - 2 * c.x, 0)
   if (moved.type === 'text') return { ...moved, rotation: rot, leader: o.type === 'text' && o.leader ? mx(o.leader) : undefined }
-  if (moved.type === 'profile' || moved.type === 'image' || moved.type === 'person') return { ...moved, rotation: rot, flipX: !moved.flipX }
+  if (moved.type === 'profile' || moved.type === 'image' || moved.type === 'person' || moved.type === 'part') return { ...moved, rotation: rot, flipX: !moved.flipX }
   return { ...moved, rotation: rot }
 }
 
@@ -215,7 +223,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
     case 'deck':
     case 'weld':
     case 'envelope':
-    case 'seam': {
+    case 'seam':
+    case 'clamp': {
       const p1 = sp({ x: obj.x1, y: obj.y1 })
       const p2 = sp({ x: obj.x2, y: obj.y2 })
       return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
@@ -230,6 +239,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
       return { ...obj, ...sp(obj) }
     case 'person':
       return { ...obj, ...sp(obj), height: obj.height * sf }
+    case 'part':
+      return { ...obj, ...sp(obj), scale: (obj.scale ?? 1) * sf }
   }
 }
 

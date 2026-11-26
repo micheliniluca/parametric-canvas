@@ -81,6 +81,7 @@ export const styleCaps = (o: CanvasObject | null) => {
     case 'weld': return { stroke: true, width: true, dash: false, fill: false }
     case 'envelope': return { stroke: true, width: true, dash: false, fill: true }
     case 'screw': return { stroke: true, width: true, dash: false, fill: true }
+    case 'cushion': return { stroke: true, width: true, dash: false, fill: true }
     case 'clamp': return { stroke: true, width: true, dash: false, fill: true }
     case 'part': return { stroke: true, width: true, dash: false, fill: false }
     case 'person': return { stroke: true, width: false, dash: false, fill: false }

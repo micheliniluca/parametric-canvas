@@ -9,6 +9,7 @@ import { personBounds, personLabel, personPolygons } from './peopleUtils'
 import { partDef, partWorld } from './partsLib'
 import { kederDrawing } from './kederUtils'
 import { clampDrawing, clampLabel } from './clampUtils'
+import { cushionDrawing, cushionLabel } from './cushionUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from './envelopeUtils'
 import { weldDrawing } from './weldUtils'
 import { leaderTerminal, textLeader } from './leaderUtils'
@@ -271,6 +272,14 @@ function entitiesOf(o: CanvasObject): Ent[] {
         const b = boltBounds(o)
         text('BULLONI', { x: b.x + b.w + 6, y: b.y - 4 }, 12, boltLabel(o), 0, 'left', 'baseline')
       }
+      break
+    }
+
+    case 'cushion': {
+      const dr = cushionDrawing(o)
+      for (const l of dr.layers) out.push({ kind: 'poly', layer: 'COMPONENTI', color, pts: l.pts, closed: false })
+      path('ASSI', dr.axis)
+      if (o.showLabel) text('COMPONENTI', { x: dr.bounds.x + dr.bounds.w / 2, y: dr.bounds.y - 8 }, Math.max(12, dr.bounds.w / 40), cushionLabel(o), 0, 'center', 'baseline')
       break
     }
 

@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CableObject, CanvasObject, ClampObject, KederSpec, PolylineObject, DeckObject, EnvelopeObject, PartObject, PersonId, PersonObject, ScrewObject, SeamObject, WeldObject } from './types'
+import type { CableObject, CanvasObject, ClampObject, CushionObject, KederSpec, PolylineObject, DeckObject, EnvelopeObject, PartObject, PersonId, PersonObject, ScrewObject, SeamObject, WeldObject } from './types'
 import type { ScreenshotMode } from './App'
 import { Catalog } from './components/Catalog'
 import { MaffeisLogo } from './components/MaffeisLogo'
@@ -29,6 +29,7 @@ import { PEOPLE, personDef } from './utils/peopleUtils'
 import { partDef, partSourceLabel, useParts } from './utils/partsLib'
 import { KEDER_DIAMETERS } from './utils/kederUtils'
 import { CLAMP_BOLTS, CLAMP_PLATES, clampDims, clampLabel } from './utils/clampUtils'
+import { cushionFrame, cushionLabel } from './utils/cushionUtils'
 import { PartCatalog } from './components/PartCatalog'
 import { HatchPattern } from './canvas/HatchPattern'
 import {
@@ -73,7 +74,7 @@ export type PanelTab = 'props' | 'catalog' | 'parts' | 'export'
 const TYPE_LABEL: Record<CanvasObject['type'], string> = {
   rect: 'Rettangolo', circle: 'Cerchio', text: 'Testo', profile: 'Profilo', image: 'Immagine',
   symbol: 'Bollino', arrow: 'Freccia', bolt: 'Bullone', quote: 'Quota', polyline: 'Linea', cable: 'Cavo FLC', deck: 'Lamiera grecata', weld: 'Saldatura',
-  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite', person: 'Persona', part: 'Componente', clamp: 'Morsetto radiale',
+  envelope: 'Involucro', seam: 'Copertura aggraffata', screw: 'Vite', person: 'Persona', part: 'Componente', clamp: 'Morsetto radiale', cushion: 'Cuscino ETFE',
 }
 
 const Field = ({ label, children, full }: { label: string; children: ReactNode; full?: boolean }) => (
@@ -964,6 +965,52 @@ function ClampProps({ o, onChange }: { o: ClampObject; onChange: (patch: Partial
   )
 }
 
+/** Freccia come frazione della campata: L / n, con il valore in mm */
+function Ratio({ L, label, value, onSet }: { L: number; label: string; value: number; onSet: (n: number) => void }) {
+  return (
+    <Field label={label}>
+      <div className="ratio-field">
+        <span>L /</span>
+        <Num value={value} min={2} step={1} onChange={v => v >= 2 && onSet(v)} />
+        <span className="muted">{Math.round(L / value).toLocaleString('it-IT')} mm</span>
+      </div>
+    </Field>
+  )
+}
+
+function CushionProps({ o, onChange }: { o: CushionObject; onChange: (patch: Partial<CanvasObject>) => void }) {
+  const { L } = cushionFrame(o)
+  return (
+    <>
+      <div className="profile-id">
+        <div className="profile-id-name">{cushionLabel(o)}</div>
+        <div className="muted">Campata L {Math.round(L).toLocaleString('it-IT')} mm · frecce come frazione di L</div>
+      </div>
+      <div className="prop-grid">
+        <Field label="Strati" full>
+          <div className="segmented">
+            {([2, 3] as const).map(n => (
+              <button key={n} type="button" className={o.layers === n ? 'active' : ''} onClick={() => onChange({ layers: n })}>{n} strati</button>
+            ))}
+          </div>
+        </Field>
+        <Ratio L={L} label="Strato superiore ↑" value={o.topN} onSet={v => onChange({ topN: v })} />
+        <Ratio L={L} label="Strato inferiore ↓" value={o.bottomN} onSet={v => onChange({ bottomN: v })} />
+        {o.layers === 3 && <Ratio L={L} label="3° strato ↑" value={o.thirdN} onSet={v => onChange({ thirdN: v })} />}
+        {o.layers === 3 && <div />}
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.flip} onChange={e => onChange({ flip: e.target.checked })} />
+          Inverti alto / basso
+        </label>
+        <label className="check-label">
+          <input type="checkbox" checked={!!o.showLabel} onChange={e => onChange({ showLabel: e.target.checked })} />
+          Designazione sul disegno
+        </label>
+      </div>
+    </>
+  )
+}
+
 function DeckProps({ o, onChange }: { o: DeckObject; onChange: (patch: Partial<CanvasObject>) => void }) {
   const p = deckProfile(o.profile)
   const t = deckThickness(o)
@@ -1439,6 +1486,7 @@ function ObjectProps({ o, onChange, onExplode }: { o: CanvasObject; onChange: (p
       {o.type === 'cable' && <CableProps o={o} onChange={onChange} />}
       {o.type === 'deck' && <DeckProps o={o} onChange={onChange} />}
       {o.type === 'weld' && <WeldProps o={o} onChange={onChange} />}
+      {o.type === 'cushion' && <CushionProps o={o} onChange={onChange} />}
       {o.type === 'clamp' && <ClampProps o={o} onChange={onChange} />}
       {o.type === 'polyline' && o.keder && <KederProps o={o} onChange={onChange} />}
       {o.type === 'part' && <PartProps o={o} onChange={onChange} onExplode={onExplode} />}

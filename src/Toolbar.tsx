@@ -1,10 +1,11 @@
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CanvasObject } from './types'
 import type { ToolId } from './tools'
 import { TOOLS } from './tools'
 import {
   Camera, Undo2, Redo2, FilePlus2, FolderOpen, Save, ClipboardPaste, Lock, LockOpen,
-  ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup, FlipHorizontal2,
+  ChevronDown, ChevronsUp, ChevronsDown, Trash2, Copy, PanelRightOpen, PanelRightClose, Group, Ungroup, FlipHorizontal2,
 } from 'lucide-react'
 import { MaffeisLogo } from './components/MaffeisLogo'
 
@@ -56,11 +57,88 @@ const Btn = ({ title, onClick, active, disabled, children, className }: {
 
 const Sep = () => <div className="tb-sep" />
 
+/** Famiglie di strumenti: un pulsante con l'ultimo strumento usato e un menu con gli altri */
+const FAMILIES: { name: string; tools: ToolId[] }[] = [
+  { name: 'Disegno', tools: ['freehand', 'line', 'polyline', 'arrow', 'rect', 'circle'] },
+  { name: 'Acciaio', tools: ['profile', 'bolt', 'screw', 'weld'] },
+  { name: 'Membrane', tools: ['part', 'cushion', 'keder', 'clamp', 'cable'] },
+  { name: 'Involucro', tools: ['deck', 'envelope', 'seam'] },
+  { name: 'Annotazioni', tools: ['quote', 'bubble', 'measure', 'person'] },
+  { name: 'Immagine', tools: ['scale', 'wand', 'crop'] },
+]
+
+const shortcutOf = (id: ToolId) => (TOOLS[id].shortcut ? ` (${TOOLS[id].shortcut})` : '')
+
+function ToolFamily({ name, tools, tool, setTool, isDisabled }: {
+  name: string
+  tools: ToolId[]
+  tool: ToolId
+  setTool: (t: ToolId) => void
+  isDisabled: (t: ToolId) => boolean
+}) {
+  const [last, setLast] = useState<ToolId>(tools[0])
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const inFamily = tools.includes(tool)
+  // il pulsante mostra l'ultimo strumento della famiglia scelto (anche da tastiera)
+  useEffect(() => { if (inFamily) setLast(tool) }, [tool, inFamily])
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', esc)
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc) }
+  }, [open])
+
+  const shown = inFamily ? tool : last
+  const Icon = TOOLS[shown].icon
+  const disabled = isDisabled(shown)
+  return (
+    <div className={`tb-family ${open ? 'open' : ''}`} ref={ref}>
+      <button
+        className={`tb-btn tb-family-main ${inFamily ? 'active' : ''}`}
+        title={`${name}: ${TOOLS[shown].label}${shortcutOf(shown)} — freccia o tasto destro per gli altri`}
+        aria-label={`${name}: ${TOOLS[shown].label}`}
+        aria-pressed={inFamily}
+        onClick={() => (disabled ? setOpen(true) : setTool(tool === shown ? 'select' : shown))}
+        onContextMenu={e => { e.preventDefault(); setOpen(o => !o) }}
+      >
+        <Icon size={18} />
+      </button>
+      <button className={`tb-family-caret ${inFamily ? 'active' : ''}`} title={`Strumenti ${name.toLowerCase()}`}
+        aria-label={`Altri strumenti: ${name}`} aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <ChevronDown size={11} />
+      </button>
+      {open && (
+        <div className="tb-flyout" role="menu">
+          <div className="tb-flyout-title">{name}</div>
+          {tools.map(id => {
+            const T = TOOLS[id]
+            const TIcon = T.icon
+            const dis = isDisabled(id)
+            return (
+              <button key={id} role="menuitem" className={`tb-flyout-item ${tool === id ? 'active' : ''}`} disabled={dis}
+                title={dis ? "Seleziona prima un'immagine" : T.hint}
+                onClick={() => { setTool(id); setOpen(false) }}>
+                <TIcon size={17} />
+                <span>{T.label}</span>
+                {T.shortcut && <kbd>{T.shortcut}</kbd>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Toolbar(p: Props) {
+  const isDisabled = (id: ToolId) => TOOLS[id].needs === 'image' && p.selected?.type !== 'image'
   const toolBtn = (id: ToolId) => {
     const t = TOOLS[id]
     const Icon = t.icon
-    const disabled = t.needs === 'image' && p.selected?.type !== 'image'
+    const disabled = isDisabled(id)
     const why = disabled ? ' — seleziona prima un\'immagine' : ''
     return (
       <Btn
@@ -95,33 +173,12 @@ export function Toolbar(p: Props) {
       <div className="tb-group tb-center">
         {toolBtn('select')}
         <Sep />
-        {toolBtn('freehand')}
-        {toolBtn('line')}
-        {toolBtn('polyline')}
-        {toolBtn('arrow')}
-        {toolBtn('rect')}
-        {toolBtn('circle')}
+        {FAMILIES.slice(0, 1).map(f => <ToolFamily key={f.name} {...f} tool={p.tool} setTool={p.setTool} isDisabled={isDisabled} />)}
         {toolBtn('text')}
         <Sep />
-        {toolBtn('profile')}
-        {toolBtn('bolt')}
-        {toolBtn('screw')}
-        {toolBtn('person')}
-        {toolBtn('part')}
-        {toolBtn('keder')}
-        {toolBtn('clamp')}
-        {toolBtn('cable')}
-        {toolBtn('deck')}
-        {toolBtn('envelope')}
-        {toolBtn('seam')}
-        {toolBtn('weld')}
-        {toolBtn('quote')}
-        {toolBtn('bubble')}
-        {toolBtn('measure')}
+        {FAMILIES.slice(1, 4).map(f => <ToolFamily key={f.name} {...f} tool={p.tool} setTool={p.setTool} isDisabled={isDisabled} />)}
         <Sep />
-        {toolBtn('scale')}
-        {toolBtn('wand')}
-        {toolBtn('crop')}
+        {FAMILIES.slice(4).map(f => <ToolFamily key={f.name} {...f} tool={p.tool} setTool={p.setTool} isDisabled={isDisabled} />)}
       </div>
 
       <div className="tb-group">

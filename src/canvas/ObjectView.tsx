@@ -11,6 +11,7 @@ import { personBounds, personLabel, personPath } from '../utils/peopleUtils'
 import { PartView } from './PartView'
 import { kederDrawing } from '../utils/kederUtils'
 import { clampDrawing, clampLabel } from '../utils/clampUtils'
+import { cushionDrawing, cushionLabel } from '../utils/cushionUtils'
 import { envelopeDrawing, envelopeLabel, envelopeThickness, labelPlacement, seamDrawing, seamLabel } from '../utils/envelopeUtils'
 import { leaderTerminal, textLeader } from '../utils/leaderUtils'
 import { quoteTerminals } from '../utils/quoteUtils'
@@ -286,6 +287,25 @@ function renderObject({ o, interactive, onMouseDown, onDoubleClick, hideText, im
           {o.showLabel && (
             <text x={b.x + b.w + 6} y={b.y - 4} fontSize={12} fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
               {boltLabel(o)}
+            </text>
+          )}
+        </g>
+      )
+    }
+
+    case 'cushion': {
+      const sw = o.strokeWidth ?? 1
+      const dr = cushionDrawing(o)
+      const b = dr.bounds
+      return (
+        <g onPointerDown={down} pointerEvents={pe}>
+          <path d={dr.fill} fill={o.fillEnabled ? o.fillColor || '#e0f2fe' : 'transparent'} fillOpacity={fo} stroke="none" pointerEvents={pe} />
+          <path d={dr.axis} fill="none" stroke={stroke} strokeOpacity={0.5} strokeWidth={sw * 0.35}
+            strokeDasharray={`${sw * 12} ${sw * 3} ${sw * 2} ${sw * 3}`} pointerEvents="none" />
+          <path d={dr.lines} fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" pointerEvents="none" />
+          {o.showLabel && (
+            <text x={b.x + b.w / 2} y={b.y - 8} fontSize={Math.max(12, b.w / 40)} textAnchor="middle" fill={stroke} pointerEvents="none" style={{ userSelect: 'none' }}>
+              {cushionLabel(o)}
             </text>
           )}
         </g>

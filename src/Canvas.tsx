@@ -24,6 +24,7 @@ import { ENVELOPE_KINDS } from './utils/envelopeUtils'
 import { defaultScrew } from './utils/screwUtils'
 import { makePart, partDef, useParts } from './utils/partsLib'
 import { DEFAULT_KEDER } from './utils/kederUtils'
+import { CUSHION_DEFAULT } from './utils/cushionUtils'
 import type { KederSpec } from './types'
 import type { WandState } from './canvas/Overlays'
 
@@ -263,6 +264,19 @@ export function Canvas({
       aqInnerStud: prev?.aqInnerStud ?? 50, aqGap: prev?.aqGap ?? 10, aqBoards: prev?.aqBoards ?? 1, aqInsulation: prev?.aqInsulation ?? true,
       stroke: drawStyle.stroke, strokeWidth: 1, fillEnabled: true,
       fillColor: prev?.fillColor ?? ENVELOPE_KINDS.find(k => k.id === kind)!.fill,
+    }
+  }
+
+  /** un nuovo cuscino riprende strati e frecce dell'ultimo */
+  const makeCushion = (p1: Point, p2: Point): CanvasObject => {
+    const last = [...objects].reverse().find(o => o.type === 'cushion')
+    const prev = last?.type === 'cushion' ? last : null
+    return {
+      id: crypto.randomUUID(), type: 'cushion', x: 0, y: 0, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+      layers: prev?.layers ?? 2, topN: prev?.topN ?? CUSHION_DEFAULT.topN, bottomN: prev?.bottomN ?? CUSHION_DEFAULT.bottomN,
+      thirdN: prev?.thirdN ?? CUSHION_DEFAULT.thirdN, showLabel: false,
+      stroke: prev?.stroke ?? drawStyle.stroke, strokeWidth: prev?.strokeWidth ?? 1,
+      fillEnabled: prev?.fillEnabled, fillColor: prev?.fillColor,
     }
   }
 
@@ -565,6 +579,7 @@ export function Canvas({
       }
       case 'cable':
       case 'clamp':
+      case 'cushion':
       case 'deck':
       case 'envelope':
       case 'seam':
@@ -670,6 +685,8 @@ export function Canvas({
       addObject(makeSeam(s.p1, s.p2))
     } else if (tool === 'clamp') {
       addObject(makeClamp(s.p1, s.p2))
+    } else if (tool === 'cushion') {
+      addObject(makeCushion(s.p1, s.p2))
     } else if (tool === 'measure') {
       setMeasure(s)
     } else if (tool === 'scale') {
@@ -746,7 +763,7 @@ export function Canvas({
     if (!a) {
       if (segment && tool === 'rect') {
         setSegment({ ...segment, p2: rectCorner(e, segment.p1) })
-      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'clamp' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
+      } else if (segment && (tool === 'quote' || tool === 'cable' || tool === 'deck' || tool === 'envelope' || tool === 'seam' || tool === 'clamp' || tool === 'cushion' || tool === 'weld' || tool === 'measure' || tool === 'scale')) {
         setSegment({ ...segment, p2: pick(e, segment.p1) })
       } else if (tool === 'profile' || tool === 'bubble') {
         setHover(pick(e))
@@ -1128,6 +1145,11 @@ export function Canvas({
               <g opacity={0.55} pointerEvents="none">
                 <ObjectView o={tool === 'envelope' ? makeEnvelope(segment.p1, segment.p2) : makeSeam(segment.p1, segment.p2)}
                   interactive={false} onMouseDown={() => {}} />
+              </g>
+            )}
+            {segment && tool === 'cushion' && dist(segment.p1, segment.p2) > 0 && (
+              <g opacity={0.55} pointerEvents="none">
+                <ObjectView o={makeCushion(segment.p1, segment.p2)} interactive={false} onMouseDown={() => {}} />
               </g>
             )}
             {segment && tool === 'clamp' && dist(segment.p1, segment.p2) > 0 && (

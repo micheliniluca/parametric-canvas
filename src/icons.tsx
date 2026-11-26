@@ -49,6 +49,14 @@ export const IconScrew = ({ size }: Props) => (
   </Svg>
 )
 
+/** Cuscino ETFE: due strati ad arco */
+export const IconCushion = ({ size }: Props) => (
+  <Svg size={size}>
+    <path d="M 3 13 Q 12 4 21 13 Q 12 22 3 13 Z" strokeWidth={1.5} strokeLinejoin="round" />
+    <path d="M 3 13 Q 12 1 21 13" strokeWidth={1} strokeDasharray="2 1.5" />
+  </Svg>
+)
+
 /** Keder: membrana che avvolge il cordone */
 export const IconKeder = ({ size }: Props) => (
   <Svg size={size}>

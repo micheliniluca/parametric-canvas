@@ -10,6 +10,7 @@ import { screwLabel } from '../utils/screwUtils'
 import { personLabel } from '../utils/peopleUtils'
 import { partLabel } from '../utils/partsLib'
 import { clampLabel } from '../utils/clampUtils'
+import { cushionLabel } from '../utils/cushionUtils'
 import { kederLabel } from '../utils/kederUtils'
 import { textLeader } from '../utils/leaderUtils'
 
@@ -75,6 +76,7 @@ export function SelectionOverlay({ o, zoom, onGrip, coarse }: Props) {
   else if (o.type === 'person') parts.push(personLabel(o))
   else if (o.type === 'part') parts.push(partLabel(o))
   else if (o.type === 'clamp') parts.push(clampLabel(o))
+  else if (o.type === 'cushion') parts.push(cushionLabel(o))
   else if (o.type === 'polyline' && o.keder) parts.push(kederLabel(o.keder))
   else if (o.type === 'envelope') parts.push(`${envelopeLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)
   else if (o.type === 'seam') parts.push(`${seamLabel(o)} · L ${round1(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}`)

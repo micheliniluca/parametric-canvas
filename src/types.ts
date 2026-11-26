@@ -1,6 +1,6 @@
 export type BaseObject = {
   id: string
-  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw' | 'person' | 'part' | 'clamp'
+  type: 'rect' | 'circle' | 'text' | 'profile' | 'image' | 'symbol' | 'arrow' | 'bolt' | 'quote' | 'polyline' | 'cable' | 'deck' | 'weld' | 'envelope' | 'seam' | 'screw' | 'person' | 'part' | 'clamp' | 'cushion'
   x: number
   y: number
   stroke?: string
@@ -143,6 +143,25 @@ export type ClampObject = BaseObject & {
   kederD?: number
   /** membrana con keder tra le ganasce */
   showMembrane?: boolean
+  showLabel?: boolean
+}
+
+/**
+ * Cuscino ETFE in sezione: (x1, y1)–(x2, y2) = estremità della campata. Strati ad arco con freccia L/n:
+ * superiore verso l'alto, inferiore verso il basso, terzo (facoltativo) verso l'alto.
+ */
+export type CushionObject = BaseObject & {
+  type: 'cushion'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  layers: 2 | 3
+  topN: number
+  bottomN: number
+  thirdN: number
+  /** inverte il verso "alto" */
+  flip?: boolean
   showLabel?: boolean
 }
 
@@ -407,4 +426,4 @@ export type SymbolObject = BaseObject & {
 
 export type Point = { x: number; y: number }
 
-export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject | PersonObject | PartObject | ClampObject
+export type CanvasObject = RectObject | CircleObject | TextObject | ProfileObject | PolylineObject | ImageObject | SymbolObject | ArrowObject | BoltObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ScrewObject | PersonObject | PartObject | ClampObject | CushionObject

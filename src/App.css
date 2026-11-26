@@ -102,6 +102,107 @@ button:disabled {
   background: var(--primary-hover);
 }
 
+/* famiglie di strumenti con menu a tendina */
+.tb-family {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tb-family-caret {
+  width: 14px;
+  height: 34px;
+  padding: 0;
+  margin-left: -2px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 5px;
+}
+
+.tb-family-caret:hover,
+.tb-family.open .tb-family-caret {
+  background: rgba(255, 255, 255, 0.10);
+  color: white;
+}
+
+.tb-family-caret.active {
+  color: white;
+}
+
+.tb-flyout {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
+  min-width: 250px;
+  padding: 4px;
+  background: white;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+
+.tb-flyout-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 4px 8px 6px;
+}
+
+.tb-flyout-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.tb-flyout-item span {
+  flex: 1;
+}
+
+.tb-flyout-item kbd {
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+.tb-flyout-item:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.tb-flyout-item.active {
+  background: var(--primary);
+  color: white;
+}
+
+.tb-flyout-item.active kbd {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.tb-flyout-item:disabled {
+  opacity: 0.45;
+}
+
 /* ================= AREA PRINCIPALE ================= */
 
 .main {
@@ -1085,4 +1186,19 @@ button:disabled {
 .parts-catalog .catalog-tabs button {
   flex: 1 1 45%;
   padding: 5px 6px;
+}
+
+.ratio-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ratio-field input {
+  width: 52px;
+}
+
+.ratio-field .muted {
+  font-size: 0.7rem;
+  white-space: nowrap;
 }

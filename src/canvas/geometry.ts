@@ -1,4 +1,4 @@
-import type { ArrowObject, CableObject, CanvasObject, ClampObject, DeckObject, EnvelopeObject, Point, QuoteObject, SeamObject, WeldObject } from '../types'
+import type { ArrowObject, CableObject, CanvasObject, ClampObject, CushionObject, DeckObject, EnvelopeObject, Point, QuoteObject, SeamObject, WeldObject } from '../types'
 import { findProfile } from '../profiles'
 import { getBeamPoints } from '../beamPath'
 import { boltBounds, boltCenters } from '../utils/boltUtils'
@@ -11,12 +11,13 @@ import { personBounds } from '../utils/peopleUtils'
 import { partBounds } from '../utils/partsLib'
 import { kederDrawing } from '../utils/kederUtils'
 import { clampDrawing } from '../utils/clampUtils'
+import { cushionDrawing } from '../utils/cushionUtils'
 
 /** Oggetti definiti da due estremità (x1, y1) – (x2, y2) */
-export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ClampObject
+export type EndpointObject = ArrowObject | QuoteObject | CableObject | DeckObject | WeldObject | EnvelopeObject | SeamObject | ClampObject | CushionObject
 export const isEndpoint = (o: CanvasObject): o is EndpointObject =>
   o.type === 'arrow' || o.type === 'quote' || o.type === 'cable' || o.type === 'deck' || o.type === 'weld' ||
-  o.type === 'envelope' || o.type === 'seam' || o.type === 'clamp'
+  o.type === 'envelope' || o.type === 'seam' || o.type === 'clamp' || o.type === 'cushion'
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -93,6 +94,8 @@ export const getObjectBounds = (o: CanvasObject): { x: number; y: number; w: num
       return seamBounds(o)
     case 'clamp':
       return clampDrawing(o).bounds
+    case 'cushion':
+      return cushionDrawing(o).bounds
     case 'profile': {
       const profile = findProfile(o.profileName)
       if (!profile) return { x: o.x, y: o.y, w: 0, h: 0 }
@@ -127,6 +130,7 @@ export const translateObject = (o: CanvasObject, dx: number, dy: number): Canvas
     case 'envelope':
     case 'seam':
     case 'clamp':
+    case 'cushion':
       return { ...o, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy }
     case 'text':
       return { ...o, x: o.x + dx, y: o.y + dy, leader: o.leader && mv(o.leader) }
@@ -224,7 +228,8 @@ export const scaleObject = (obj: CanvasObject, origin: Point, sf: number): Canva
     case 'weld':
     case 'envelope':
     case 'seam':
-    case 'clamp': {
+    case 'clamp':
+    case 'cushion': {
       const p1 = sp({ x: obj.x1, y: obj.y1 })
       const p2 = sp({ x: obj.x2, y: obj.y2 })
       return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }

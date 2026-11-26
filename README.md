@@ -11,9 +11,9 @@ npm run dev
 
 | Zona | Contenuto |
 |---|---|
-| Barra in alto | file (nuovo, apri, salva), annulla/ripeti, strumenti, azioni sull'oggetto selezionato, screenshot |
+| Barra in alto | file (nuovo, apri, salva), annulla/ripeti, strumenti, azioni sull'oggetto selezionato, screenshot. Strumenti in famiglie (Disegno, Acciaio, Membrane, Involucro, Annotazioni, Immagine): il pulsante mostra l'ultimo usato, la freccia o il tasto destro aprono gli altri; le scorciatoie restano valide |
 | Barra stili (flottante) | colore linea, riempimento, spessore, tipo linea. Senza selezione imposta lo stile dei prossimi oggetti, con selezione modifica l'oggetto |
-| Pannello a destra | proprietà dell'oggetto selezionato, catalogo profili, esportazione |
+| Pannello a destra | proprietà dell'oggetto selezionato, catalogo profili, componenti per membrane, esportazione |
 | Barra di stato | SNAP / ORTO / GRIGLIA, passo griglia, coordinate, zoom, suggerimento dello strumento attivo |
 
 ## Scorciatoie
@@ -40,6 +40,7 @@ npm run dev
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | W | Saldatura (ISO 2553 o AWS A2.4): clic sul giunto, clic dove va la linea di riferimento; tipo (angolo, I, V, mezza V, Y, mezza Y, U, J; su due lati X, K…), lato, quote, a tratti, tutto intorno, in opera, finitura, coda con procedimento e testo libero; cordone pieno in scala sulla punta della freccia |
 | Y | Persona in scala: clic dove poggia i piedi; figura dal menu (operai con casco, pala, sacco, in ginocchio, con scala; pubblico: uomo, donna, bambino, anziano, carrozzina, con borsa; tifosi con braccia alzate, sciarpa, bandiera, seduti), frontali o di profilo; altezza 1,80 m variabile, verso, sagoma piena anche nel DXF (layer PERSONE) |
+| S | Cuscino ETFE in sezione: clic sulle due estremità della campata L; 2 strati ad arco con freccia L/10 verso l'alto e verso il basso, 3° strato facoltativo (intermedio) a L/20 verso l'alto; frecce modificabili (L/n), alto/basso invertibile, riempimento e designazione facoltativi |
 | X | Membrana con keder (in sezione): polilinea = asse della membrana, l'ultimo (e/o il primo) punto è il centro del keder; Ø keder, spessore, tratto a doppio strato saldato, keder all'inizio e/o alla fine |
 | O | Morsetto radiale per fune: clic sull'asse del bullone e sull'asse della fune (L = distanza); Ø fune, spessore dei piatti, bullone M10–M24, guaina, due ganasce in alluminio al bullone con scanalatura per il keder (Ø a scelta) e membrana stretta tra le ganasce; fune, membrana e designazione facoltative |
 | G | Componente per membrane (ETFE e tessuto PTFE): scheda **Componenti** con anteprime, filtro ETFE / tessuto, gruppi (profili in alluminio, guarnizioni e keder, funi e terminali) e ricerca; clic sulla tela per inserirlo in grandezza reale. Scala, verso, rotazione; **Esplodi** lo trasforma in polilinee e testi raggruppati e modificabili. Nel DXF sul layer COMPONENTI |

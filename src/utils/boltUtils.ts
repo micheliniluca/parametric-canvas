@@ -8,6 +8,10 @@ import type { BoltObject, CanvasObject, Point } from '../types'
 export type BoltDims = { d: number; s: number; k: number; m: number; dw: number; hw: number; d0: number; p: number }
 
 const TABLE: Record<number, Omit<BoltDims, 'd'>> = {
+  5: { s: 8, k: 3.5, m: 4.7, dw: 10, hw: 1, d0: 5.5, p: 0.8 },
+  6: { s: 10, k: 4, m: 5.2, dw: 12, hw: 1.6, d0: 6.6, p: 1 },
+  8: { s: 13, k: 5.3, m: 6.8, dw: 16, hw: 1.6, d0: 9, p: 1.25 },
+  10: { s: 16, k: 6.4, m: 8.4, dw: 20, hw: 2, d0: 11, p: 1.5 },
   12: { s: 18, k: 7.5, m: 10.8, dw: 24, hw: 2.5, d0: 13, p: 1.75 },
   14: { s: 21, k: 8.8, m: 12.8, dw: 28, hw: 2.5, d0: 15, p: 2 },
   16: { s: 24, k: 10, m: 14.8, dw: 30, hw: 3, d0: 18, p: 2 },

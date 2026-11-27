@@ -13,6 +13,9 @@ const f = (n: number) => +n.toFixed(2)
 const path = (pts: Point[], close = false) =>
   pts.length > 1 ? `M ${pts.map(p => `${f(p.x)} ${f(p.y)}`).join(' L ')}${close ? ' Z' : ''} ` : ''
 
+/** Materiali del morsetto (layer del DXF) */
+export type ClampMaterial = 'steel' | 'alu' | 'other' | 'bolt' | 'fabric' | 'cable'
+
 /** Spessore della guaina/inserto tra fune e piatti */
 export const clampLiner = (D: number) => Math.max(2, Math.round(D * 0.05 * 2) / 2)
 
@@ -46,7 +49,14 @@ export function clampDrawing(o: ClampObject) {
   const Wp = (p: Point) => W(p.x, p.y)
   let outline = '', thin = '', axis = ''
   const all: Point[] = []
+  /** materiale corrente: serve al DXF per mettere ogni parte sul suo layer */
+  let mat: ClampMaterial = 'steel'
+  const byMat: Record<ClampMaterial, { outline: string; thin: string }> = {
+    steel: { outline: '', thin: '' }, alu: { outline: '', thin: '' }, other: { outline: '', thin: '' },
+    bolt: { outline: '', thin: '' }, fabric: { outline: '', thin: '' }, cable: { outline: '', thin: '' },
+  }
   const add = (pts: Point[], close = true, into: 'outline' | 'thin' = 'outline') => {
+    byMat[mat][into] += path(pts.map(Wp), close)
     const s = path(pts.map(Wp), close)
     if (into === 'outline') outline += s; else thin += s
     all.push(...pts.map(Wp))
@@ -82,14 +92,17 @@ export function clampDrawing(o: ClampObject) {
 
   // guaina / inserto attorno alla fune
   const lin = [...arcPts(R + ti, thN, -thN), ...arcPts(R, -thN, thN)]
+  mat = 'other'
   add(lin)
 
   // fune
+  mat = 'cable'
   if (o.showCable !== false) {
     const c = arcPts(R, 0, 2 * Math.PI)
     add(c.slice(0, -1))
   }
 
+  mat = 'bolt'
   // bullone: asse lungo n; testa sopra il piatto superiore, dado sotto quello inferiore
   const m = met(d)
   const face = g / 2 + t
@@ -130,8 +143,10 @@ export function clampDrawing(o: ClampObject) {
     pts.push({ x: J.xg + J.rg, y: yi }, { x: J.xr, y: yi }, { x: J.xr, y: yo - s * rr })
     add(pts)
   }
+  mat = 'alu'
   jaw(-1)
   jaw(1)
+  mat = 'fabric'
   if (o.showMembrane !== false) {
     // membrana che entra tra le ganasce e avvolge il keder, con il lembo fino al bullone
     const xm = J.xl - Math.max(30, J.tj * 2)
@@ -145,6 +160,7 @@ export function clampDrawing(o: ClampObject) {
     add(Array.from({ length: 36 }, (_, i) => ({ x: J.xg + rk * Math.cos((i * Math.PI) / 18), y: rk * Math.sin((i * Math.PI) / 18) })))
     add([{ x: J.xg + J.rg, y: 0 }, { x: J.xr * 0.6, y: 0 }], false, 'thin')
   }
+  mat = 'bolt'
   // gambo del bullone attraverso le ganasce (linee sottili)
   add([{ x: -d / 2, y: -g / 2 }, { x: -d / 2, y: g / 2 }], false, 'thin')
   add([{ x: d / 2, y: -g / 2 }, { x: d / 2, y: g / 2 }], false, 'thin')
@@ -163,7 +179,7 @@ export function clampDrawing(o: ClampObject) {
 
   const xs = all.map(p => p.x), ys = all.map(p => p.y)
   const x0 = Math.min(...xs), y0 = Math.min(...ys)
-  return { outline, thin, axis, bounds: { x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 } }
+  return { outline, thin, axis, byMat, bounds: { x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 } }
 }
 
 const nf = (n: number) => String(+n.toFixed(1)).replace('.', ',')

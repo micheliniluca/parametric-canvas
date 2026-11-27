@@ -39,12 +39,12 @@ npm run dev
 | H | Lamiera grecata (ComFlor 46, 60, 80, 100): clic su inizio e fine dell'appoggio, la linea è la larghezza; viste sezione, dall'alto e laterale, spessore, getto opzionale con retino, pioli Ø19 nelle gole, n° lamiere, pioli, peso e volume calcestruzzo nel pannello |
 | F | Cavo FLC (catalogo Redaelli): clic sul perno A, clic sul perno B; taglia, forcelle TTF accese/spente per estremità, interasse, peso e resistenze nel pannello |
 | W | Saldatura (ISO 2553 o AWS A2.4): clic sul giunto, clic dove va la linea di riferimento; tipo (angolo, I, V, mezza V, Y, mezza Y, U, J; su due lati X, K…), lato, quote, a tratti, tutto intorno, in opera, finitura, coda con procedimento e testo libero; cordone pieno in scala sulla punta della freccia |
-| Y | Persona in scala: clic dove poggia i piedi; figura dal menu (operai con casco, pala, sacco, in ginocchio, con scala; pubblico: uomo, donna, bambino, anziano, carrozzina, con borsa; tifosi con braccia alzate, sciarpa, bandiera, seduti), frontali o di profilo; altezza 1,80 m variabile, verso, sagoma piena anche nel DXF (layer PERSONE) |
+| Y | Persona in scala: clic dove poggia i piedi; figura dal menu (operai con casco, pala, sacco, in ginocchio, con scala; pubblico: uomo, donna, bambino, anziano, carrozzina, con borsa; tifosi con braccia alzate, sciarpa, bandiera, seduti), frontali o di profilo; altezza 1,80 m variabile, verso, sagoma piena anche nel DXF (layer ME_GREY) |
 | Z | Fune inox AISI 316: clic sui due perni; Ø 2–24 mm, terminali a forcella a pressare (art. 201260–201275) in A e/o B, tenditore forcella fresata / pressare (art. 201001–201014, Ø 2,5–22) in A o B con regolazione tra L e L¹; nella famiglia Membrane accanto al cavo FLC |
 | S | Cuscino ETFE in sezione: clic sulle due estremità della campata L; 2 strati ad arco con freccia L/10 verso l'alto e verso il basso, 3° strato facoltativo (intermedio) a L/20 verso l'alto; frecce modificabili (L/n), alto/basso invertibile, riempimento e designazione facoltativi |
 | X | Membrana con keder (in sezione): polilinea = asse della membrana, l'ultimo (e/o il primo) punto è il centro del keder; Ø keder, spessore, tratto a doppio strato saldato, keder all'inizio e/o alla fine |
 | O | Morsetto radiale per fune: clic sull'asse del bullone e sull'asse della fune (L = distanza); Ø fune, spessore dei piatti, bullone M10–M24, guaina, due ganasce in alluminio al bullone con scanalatura per il keder (Ø a scelta) e membrana stretta tra le ganasce; fune, membrana e designazione facoltative |
-| G | Componente per membrane (ETFE e tessuto PTFE): scheda **Componenti** con anteprime, filtro ETFE / tessuto, gruppi (profili in alluminio, guarnizioni e keder, funi e terminali) e ricerca; clic sulla tela per inserirlo in grandezza reale. Scala, verso, rotazione; **Esplodi** lo trasforma in polilinee e testi raggruppati e modificabili. Nel DXF sul layer COMPONENTI |
+| G | Componente per membrane (ETFE e tessuto PTFE): scheda **Componenti** con anteprime, filtro ETFE / tessuto, gruppi (profili in alluminio, guarnizioni e keder, funi e terminali) e ricerca; clic sulla tela per inserirlo in grandezza reale. Scala, verso, rotazione; **Esplodi** lo trasforma in polilinee e testi raggruppati e modificabili. Nel DXF sui layer del materiale (ME_ALUMINIUM, ME_FABRIC_SECT, ME_CABLE…) |
 | E | Involucro in sezione: clic su inizio e fine della faccia d'appoggio; isolante (retino a spirale), pannello sandwich (parete piana o copertura grecata, giunti) vetro (composizione tipo 6/16/6, 33.1/16/6, con distanziatori) o parete Knauf Aquapanel Outdoor (rasatura, lastra 12,5, Tyvek, montanti C MgZ con isolante, orditura singola o doppia, lastre interne); spessore e lato nel pannello |
 | U | Copertura aggraffata (standing seam) in sezione: clic su inizio e fine del piano di posa; doppia aggraffatura, angolare o a scatto, altezza nervatura e passo di posa |
 | Q / M | Quota (frecce o trattino obliquo alle estremità, nel pannello) / Misura |
@@ -52,7 +52,7 @@ npm run dev
 | Ctrl (tenuto) / Shift (tenuto) | Snap / ortogonale temporanei |
 | Ctrl+Z / Ctrl+Y | Annulla / Ripeti |
 | Ctrl+C / Ctrl+V / Ctrl+D | Copia / Incolla (oggetti, immagini o testo; anche dal pulsante Incolla) / Duplica |
-| Retino (pannello) | Rettangoli, cerchi e poligoni chiusi: 21 retini di materiali (calcestruzzo, c.a., acciaio, legno, laterizio pieno e forato, blocchi, pietra, terreno, ghiaia, sabbia, magrone, riporto, isolante rigido, lana minerale, intonaco, cartongesso, vetro, impermeabilizzazione, acqua) con scala e angolo; nel DXF esplosi in linee sul layer RETINI |
+| Retino (pannello) | Rettangoli, cerchi e poligoni chiusi: 21 retini di materiali (calcestruzzo, c.a., acciaio, legno, laterizio pieno e forato, blocchi, pietra, terreno, ghiaia, sabbia, magrone, riporto, isolante rigido, lana minerale, intonaco, cartongesso, vetro, impermeabilizzazione, acqua) con scala e angolo; nel DXF esplosi in linee sul layer ME_ANNO_HATCHES |
 | Pulsante Specchia | Specchia la selezione sinistra ↔ destra (con la rotazione di 180° si ottiene alto ↔ basso) |
 | Ctrl+S / Ctrl+O | Salva / Apri progetto (`.pcanvas.json`) |
 | Ctrl+0, + / − | Adatta alla vista, zoom |
@@ -88,7 +88,7 @@ src/
   style.ts             palette e stile corrente
   hooks/useHistory.ts  annulla/ripeti
   utils/project.ts     salvataggio su file e autosalvataggio
-  utils/export.ts      export DXF (R12, layer per tipo, colori ACI)
+  utils/export.ts      export DXF (R12, layer del template Maffeis ME_TEMPLATE_CAD_STEEL, DaLayer)
   utils/pathToPolylines.ts  tracciati SVG → polilinee (archi e curve suddivisi)
   profiles.ts          catalogo profili: caricamento, ricerca, compatibilità con i nomi dei vecchi disegni
   data/profiles.json   database profili Maffeis (generato dal CSV, vedi sotto)

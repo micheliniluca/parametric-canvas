@@ -207,8 +207,8 @@ export function RightPanel({
             <section>
               <h4>DXF per CAD</h4>
               <p className="muted">
-                Tutto il disegno in millimetri, un layer per tipo (profili, bulloni, cavi, quote, testi…) con i colori della tela.
-                Immagini e riempimenti non vengono esportati.
+                Tutto il disegno in millimetri, sui layer del template Maffeis (ME_STEEL, ME_ALUMINIUM, ME_BOLT, ME_CABLE,
+                ME_ANNO_TEXTS…) con colori e tipi di linea DaLayer. Immagini e riempimenti non vengono esportati.
               </p>
               <button className="btn-secondary wide" onClick={handleExport}>Esporta DXF</button>
             </section>
